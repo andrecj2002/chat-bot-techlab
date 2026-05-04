@@ -12,6 +12,14 @@ export default function DocChat() {
   const [loading, setLoading] = useState<boolean>(true);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const userOnlyMessages = messages.filter((m) => m.role === "user");
+  const userMessagesCount = userOnlyMessages.length;
+  const showLanguageOptions = !loading && messages.length > 0 && userMessagesCount === 0;
+  const showChoiceOptions = !loading && userMessagesCount === 1;
+  const firstUserLanguage = userOnlyMessages[0]?.content?.trim().toLowerCase() ?? "";
+  const isPortugueseFlow =
+    firstUserLanguage.includes("portugu") || firstUserLanguage.includes("pt");
+
   const startConversation = async (): Promise<void> => {
     try {
       const res = await fetch("/api/chat", {
@@ -30,13 +38,15 @@ export default function DocChat() {
     }
   };
 
-  const sendMessage = async (): Promise<void> => {
-    if (!input.trim()) return;
+  const sendMessageWithContent = async (content: string): Promise<void> => {
+    if (!content.trim()) return;
 
-    const userMsg: Message = { role: "user", content: input };
+    const userMsg: Message = { role: "user", content };
     const updated = [...messages, userMsg];
     setMessages(updated);
-    setInput("");
+    if (content === input) {
+      setInput("");
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/chat", {
@@ -53,6 +63,10 @@ export default function DocChat() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const sendMessage = async (): Promise<void> => {
+    await sendMessageWithContent(input);
   };
 
   useEffect(() => {
@@ -86,6 +100,43 @@ export default function DocChat() {
         )}
         <div ref={bottomRef} />
       </div>
+      {(showLanguageOptions || showChoiceOptions) && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {showLanguageOptions && (
+            <>
+              <button
+                onClick={() => void sendMessageWithContent("Português")}
+                className="px-4 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 text-sm hover:bg-blue-100 transition"
+              >
+                Português
+              </button>
+              <button
+                onClick={() => void sendMessageWithContent("English")}
+                className="px-4 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 text-sm hover:bg-blue-100 transition"
+              >
+                English
+              </button>
+            </>
+          )}
+
+          {showChoiceOptions && (
+            <>
+              <button
+                onClick={() => void sendMessageWithContent("A")}
+                className="px-4 py-2 rounded-xl border border-gray-300 bg-gray-50 text-gray-700 text-sm hover:bg-gray-100 transition"
+              >
+                {isPortugueseFlow ? "A) Conhecer os nossos serviços" : "A) Learn about our services"}
+              </button>
+              <button
+                onClick={() => void sendMessageWithContent("B")}
+                className="px-4 py-2 rounded-xl border border-gray-300 bg-gray-50 text-gray-700 text-sm hover:bg-gray-100 transition"
+              >
+                {isPortugueseFlow ? "B) Explorar uma ideia que tem" : "B) Explore an idea you have"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
       <div className="flex gap-2">
         <input
           value={input}
