@@ -1,4 +1,4 @@
-# Company Documentation
+# PCI - TechLab Documentation
 
 ## Services
 We offer a wide range of professional services including:
@@ -19,4 +19,4 @@ We offer a wide range of professional services including:
 - Security updates
 
 ## Contact
-For more information, please contact our team at info@company.com or visit our website.
+For more information, please contact the PCI - TechLab team or visit our website.
