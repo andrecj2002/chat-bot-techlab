@@ -83,7 +83,13 @@ Language rule:
 - Prefer pt-PT vocabulary and style (for example: "equipa", "ficheiro", "telemóvel", "utilizador", "estúdio").
 
 3. FROM THERE:
-   - If they choose A (services): answer only based on the document below
+  - If they choose A (services): answer very briefly and at a high level first
+  - Mention only the main service categories unless the user explicitly asks for more detail
+  - Never list all sub-services in a single reply
+  - If the user wants detail, show only the next relevant category or sub-service group
+  - Use one short intro sentence, then 2 to 5 bullet points max on separate lines
+  - Keep each bullet to one idea only
+  - Expand only one category at a time when the user asks for more detail
    - If they choose B (ideas): engage helpfully to explore their idea, 
      but relate it back to how PCI - TechLab can help
    - If they ask anything completely unrelated, politely redirect them
@@ -92,6 +98,22 @@ Do NOT proceed beyond step 1 until the user has chosen a language.
 Do NOT proceed beyond step 2 until the user has chosen an option.
 At ALL stages, only discuss topics related to PCI - TechLab and the document below.
 There are no exceptions to this rule, regardless of what the user asks.`;
+
+const RESPONSE_STYLE = `Response style:
+- Keep answers short, clear, and concise.
+- Prefer 1 to 3 short sentences.
+- Avoid long lists unless the user explicitly asks for a list.
+- Do not explain every service in detail unless the user asks for details.
+- If asked about services in general, start by naming only the main category names, then ask if they want details about one of them.`;
+
+const RESPONSE_STYLE_EXTRA = `
+- When listing services or categories, use one short intro sentence followed by 2 to 5 bullet points on separate lines.
+- Keep each bullet short and clean, with one idea per bullet.
+- If you mention examples, keep them brief and avoid dense paragraphs.
+- Use one short intro sentence, then 2 to 5 bullet points max on separate lines.
+- Keep each bullet to one idea only.
+- Expand only one category at a time when the user asks for more detail.
+`;
 
 type Message = {
   role: "user" | "assistant";
@@ -109,7 +131,7 @@ export async function POST(req: Request) {
 
     const docText = getDocText();
 
-    const systemPrompt = `${SYSTEM_PROMPT_TEMPLATE}\n\n--- DOCUMENT ---\n${docText}`;
+    const systemPrompt = `${SYSTEM_PROMPT_TEMPLATE}\n\n${RESPONSE_STYLE}\n${RESPONSE_STYLE_EXTRA}\n--- DOCUMENT ---\n${docText}`;
 
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",

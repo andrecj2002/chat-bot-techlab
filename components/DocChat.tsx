@@ -20,6 +20,71 @@ export default function DocChat() {
   const isPortugueseFlow =
     firstUserLanguage.includes("portugu") || firstUserLanguage.includes("pt");
 
+  const renderInlineBold = (text: string) => {
+    const segments = text.split(/(\*\*[^*]+\*\*)/g);
+
+    return segments.map((segment, index) => {
+      if (segment.startsWith("**") && segment.endsWith("**")) {
+        return (
+          <strong key={index} className="font-semibold text-slate-900">
+            {segment.slice(2, -2)}
+          </strong>
+        );
+      }
+
+      return <span key={index}>{segment}</span>;
+    });
+  };
+
+  const renderAssistantContent = (content: string) => {
+    const normalized = content
+      .replace(/\r/g, "")
+      .replace(/\s-\s(?=\*\*)/g, "\n- ")
+      .replace(/\s•\s/g, "\n• ")
+      .trim();
+
+    const lines = normalized.split("\n").map((line) => line.trim()).filter(Boolean);
+    const bulletLines = lines.filter((line) => /^[-•*]\s+/.test(line));
+
+    if (bulletLines.length > 0) {
+      return (
+        <div className="space-y-2">
+          {lines.map((line, index) => {
+            const isBullet = /^[-•*]\s+/.test(line);
+            const cleaned = line.replace(/^[-•*]\s+/, "");
+
+            if (isBullet) {
+              return (
+                <div key={index} className="flex items-start gap-2 text-sm leading-6 text-slate-700">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+                  <span>{renderInlineBold(cleaned)}</span>
+                </div>
+              );
+            }
+
+            return (
+              <p key={index} className="text-sm leading-6 text-slate-700">
+                {renderInlineBold(line)}
+              </p>
+            );
+          })}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {normalized
+          .split(/(?<=[.!?])\s+(?=[A-ZÀ-ÿ0-9])/)
+          .map((sentence, index) => (
+            <p key={index} className="text-sm leading-6 text-slate-700">
+              {renderInlineBold(sentence)}
+            </p>
+          ))}
+      </div>
+    );
+  };
+
   const startConversation = async (): Promise<void> => {
     try {
       const res = await fetch("/api/chat", {
@@ -86,13 +151,15 @@ export default function DocChat() {
       <div className="h-112 overflow-y-auto border border-gray-200 rounded-xl p-4 mb-3 bg-white">
         {messages.map((m, i) => (
           <div key={i} className={`mb-3 flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-            <span className={`inline-block px-4 py-2 rounded-xl max-w-[80%] text-sm ${
-              m.role === "user"
-                ? "bg-blue-500 text-white"
-                : "bg-gray-100 text-gray-800"
-            }`}>
-              {m.content}
-            </span>
+            {m.role === "user" ? (
+              <span className="inline-block max-w-[80%] rounded-2xl bg-blue-600 px-4 py-3 text-sm leading-6 text-white shadow-sm">
+                {m.content}
+              </span>
+            ) : (
+              <div className="max-w-[85%] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm">
+                {renderAssistantContent(m.content)}
+              </div>
+            )}
           </div>
         ))}
         {loading && (
