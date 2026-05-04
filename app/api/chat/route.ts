@@ -44,6 +44,7 @@ function formatDocJson(doc: DocContent) {
   return lines.join("\n");
 }
 
+// Obter documento com serviços, equipamento, dias. 
 function getDocText(): string {
   try {
     const raw = fs.readFileSync(jsonPath, "utf-8").replace(/^\uFEFF/, "");
@@ -63,6 +64,7 @@ function getDocText(): string {
   }
 }
 
+// PROMPT GERAL - Questões a colocar e caracterização do AI. 
 const SYSTEM_PROMPT_TEMPLATE = `You are an interactive assistant for PCI - TechLab.
 You guide users through a structured conversation flow.
 
@@ -99,6 +101,7 @@ Do NOT proceed beyond step 2 until the user has chosen an option.
 At ALL stages, only discuss topics related to PCI - TechLab and the document below.
 There are no exceptions to this rule, regardless of what the user asks.`;
 
+// Cracterização das respostas
 const RESPONSE_STYLE = `Response style:
 - Keep answers short, clear, and concise.
 - Prefer 1 to 3 short sentences.
@@ -106,6 +109,7 @@ const RESPONSE_STYLE = `Response style:
 - Do not explain every service in detail unless the user asks for details.
 - If asked about services in general, start by naming only the main category names, then ask if they want details about one of them.`;
 
+// Cracterização Extra das Respostas para melhor UX
 const RESPONSE_STYLE_EXTRA = `
 - When listing services or categories, use one short intro sentence followed by 2 to 5 bullet points on separate lines.
 - Keep each bullet short and clean, with one idea per bullet.
@@ -121,7 +125,8 @@ type Message = {
 };
 
 export async function POST(req: Request) {
-  try {
+  // Simular que uma primeira mensagem foi mandada (o bot só responde caso haja uma primeira mensagem por parte do User)
+    try {
     const { messages: incoming }: { messages: Message[] } = await req.json();
 
     const messages: Message[] =
