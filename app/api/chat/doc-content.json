@@ -1,0 +1,115 @@
+{
+  "company": "Nome da Empresa",
+  "services": [
+    {
+      "category": "Produção Visual",
+      "items": [
+        {
+          "name": "Pequenas Produções Audiovisuais",
+          "description": "Produção audiovisual em ambiente virtual — spots publicitários, videoclips e formatos emergentes — combina cenários digitais com captação real em estúdio.",
+          "minimum_time": "1 dia"
+        }
+      ]
+    },
+    {
+      "category": "MoCap",
+      "items": [
+        {
+          "name": "Captação de movimento humano em estúdio ou insite",
+          "description": "Captação de movimento corporal em estúdio para animação, jogos, simulação ou análise biomecânica.",
+          "minimum_time": "½ dia"
+        },
+        {
+          "name": "Captação de manuseamento de objectos",
+          "description": "Captação precisa da interação das mãos com objetos, ideal para treino em diversas áreas ou conteúdo educativo imersivo.",
+          "minimum_time": "½ dia"
+        },
+        {
+          "name": "Captação de movimento de objectos",
+          "description": "Registo da trajetória e comportamento dinâmico de objetos em movimento, para integração em simulações 3D, testes ou experiências interativas.",
+          "minimum_time": "½ dia"
+        }
+      ]
+    },
+    {
+      "category": "Podcast (Áudio / Vídeo)",
+      "items": [
+        {
+          "name": "Vídeocast multicamera",
+          "description": "Produção com múltiplos ângulos de câmara, iluminação dedicada e edição avançada, para programas com presença visual.",
+          "minimum_time": "½ dia"
+        },
+        {
+          "name": "Consultoria e desenvolvimento de conceitos",
+          "description": "Definição de identidade, formato, estrutura e estratégia editorial do projeto de podcast.",
+          "minimum_time": "5 dias"
+        }
+      ]
+    },
+    {
+      "category": "Conteúdos Imersivos (AR/VR)",
+      "items": [
+        {
+          "name": "Conteúdos Imersivos AR/VR",
+          "description": "Criação de experiências imersivas em realidade aumentada e virtual — desde filtros e overlays AR até ambientes VR completos para formação, marketing ou entretenimento.",
+          "minimum_time": "2 semanas"
+        }
+      ]
+    },
+    {
+      "category": "Digitalização 3D",
+      "items": [
+        {
+          "name": "Digitalização 3D espacial LiDAR e por Fotogrametria com drone e/ou SLAM scanning",
+          "description": "Levantamento 3D de espaços e terrenos por LiDAR terrestre ou fotogrametria com drone, gerando nuvens de pontos, ortomosaicos e modelos georreferenciados.",
+          "minimum_time": "2 dias"
+        },
+        {
+          "name": "Digitalização 3D metrológica e não metrológica Laser e/ou IR",
+          "description": "Captura dimensional de alta precisão por laser ou infravermelho (IR), para inspeção, engenharia inversa, arquivo patrimonial de peças e artefactos e modelos tridimensionais genéricos.",
+          "minimum_time": "1 dia"
+        }
+      ]
+    },
+    {
+      "category": "UX/UI",
+      "items": [
+        {
+          "name": "Aplicações web e mobile",
+          "description": "User-Centered Design para aplicações digitais — investigação, arquitetura de informação, wireframes, protótipos e testes de usabilidade.",
+          "minimum_time": "2 dias"
+        },
+        {
+          "name": "Interface humano/máquina",
+          "description": "Desenvolvimento de interfaces para equipamentos industriais e sistemas embebidos, priorizando ergonomia, segurança e eficiência operacional.",
+          "minimum_time": "2 dias"
+        }
+      ]
+    },
+    {
+      "category": "Prototipagem Rápida",
+      "items": [
+        {
+          "name": "Manufactura aditiva FDM e SLA",
+          "description": "Impressão 3D por deposição de filamento (FDM) ou resina fotopolimérica (SLA), para protótipos funcionais, maquetas e peças de elevado detalhe.",
+          "minimum_time": "1 dia"
+        },
+        {
+          "name": "Manufactura subtrativa (CNC)",
+          "description": "Fresagem CNC em madeira, materiais poliméricos e composites para peças estruturais, moldes e protótipos.",
+          "minimum_time": "1 dia"
+        },
+        {
+          "name": "Corte e gravação laser (materiais não metálicos)",
+          "description": "Corte e marcação de precisão em acrílico, madeira, cartão e outros materiais não metálicos.",
+          "minimum_time": "½ dia"
+        },
+        {
+          "name": "Arduino mockup",
+          "description": "Criação de protótipos funcionais com eletrónica programável (Arduino), para demonstração de conceito de produtos interativos, IoT e interfaces físicas.",
+          "minimum_time": "2 a 7 dias"
+        }
+      ]
+    }
+  ]
+}
