@@ -8,24 +8,39 @@ type Message = {
 
 export default function DocChat() {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [currentStep, setCurrentStep] = useState<number>(1);
   const [input, setInput] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const userOnlyMessages = messages.filter((m) => m.role === "user");
-  const userMessagesCount = userOnlyMessages.length;
   const showLanguageOptions = messages.length === 1 && messages[0]?.role === "assistant";
-  const showChoiceOptions = !loading && userMessagesCount === 1;
-  const showInput = userMessagesCount > 1;
+  
+  const showChoiceOptions = !loading && currentStep === 3;
   const firstUserLanguage = userOnlyMessages[0]?.content?.trim().toLowerCase() ?? "";
   const isPortugueseFlow =
     firstUserLanguage.includes("portugu") || firstUserLanguage.includes("pt");
-  const currentStep = userMessagesCount === 0 ? 1 : userMessagesCount === 1 ? 2 : 3;
+  const detectAssistantWantsDetails = (text: string) => {
+    return /\?|gostaria de esclarecer|gostaria de saber|poderia detalh|poderia esclarecer|pode esclarecer|pode detalh|poderia indicar|pode indicar|poderia dizer|pode dizer|por exemplo|poderia fornecer|pode fornecer|poderia clarificar|pode clarificar|mais detalhe|mais detalhes|poderia especificar/i.test(
+      text,
+    );
+  };
+
+  const detectAssistantProvidedOptions = (text: string) => {
+    if (!text) return false;
+    const hasLetterOptions = /(^|\n)\s*[A-DF]\)/i.test(text) || /\b[A-D]\b\s*(?:ou|\/|-)\s*\b[B-D]?\b/i.test(text);
+    const hasBulletLines = /(^|\n)\s*[-•*]\s+/m.test(text);
+    const mentionsOptions = /opções|escolha|escolher|escolha\s+entre|digite\s+(?:A|B|1|2)|responda\s+(?:A|B|1|2)|A\)|B\)/i.test(text);
+    return hasLetterOptions || (hasBulletLines && mentionsOptions) || mentionsOptions;
+  };
+
+  const showInput = !(currentStep === 1 || currentStep === 3);
 
   const steps = [
-    { label: "Idioma", title: "Language" },
-    { label: "Escolha", title: "Choose" },
-    { label: "Escrever", title: "Write" },
+    { label: "Língua", title: "Language" },
+    { label: "Empresa", title: "Company" },
+    { label: "Opções", title: "Options" },
+    { label: "Pedido", title: "Request" },
   ];
 
   const renderInlineBold = (text: string) => {
@@ -103,6 +118,7 @@ export default function DocChat() {
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data = await res.json();
       setMessages([{ role: "assistant", content: data.reply ?? "" }]);
+      setCurrentStep(1);
     } catch (err) {
       console.error("startConversation error:", err);
       setMessages([{ role: "assistant", content: "Sorry, something went wrong." }]);
@@ -110,16 +126,26 @@ export default function DocChat() {
       setLoading(false);
     }
   };
-
   const sendMessageWithContent = async (content: string): Promise<void> => {
     if (!content.trim()) return;
 
     const userMsg: Message = { role: "user", content };
     const updated = [...messages, userMsg];
     setMessages(updated);
+    // clear input if it came from the typed field
     if (content === input) {
       setInput("");
     }
+
+    // immediate step transitions on user actions
+    const lc = content.trim().toLowerCase();
+    if (/^portugu(es|ês)?$|^pt$|^english$|^en$/i.test(lc)) {
+      setCurrentStep(2);
+    }
+    if (/^[a-d]$/i.test(content.trim())) {
+      setCurrentStep(4);
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/chat", {
@@ -129,10 +155,21 @@ export default function DocChat() {
       });
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data = await res.json();
-      setMessages([...updated, { role: "assistant", content: data.reply ?? "" }]);
+      const assistantReply = data.reply ?? "";
+      setMessages([...updated, { role: "assistant", content: assistantReply }]);
+
+      // adjust step based on assistant reply content
+      if (detectAssistantWantsDetails(assistantReply)) {
+        setCurrentStep(2);
+      } else if (detectAssistantProvidedOptions(assistantReply)) {
+        setCurrentStep(3);
+      } else {
+        const userCount = updated.filter((m) => m.role === "user").length;
+        if (userCount >= 3) setCurrentStep(4);
+      }
     } catch (err) {
       console.error("sendMessage error:", err);
-      setMessages(prev => [...prev, { role: "assistant", content: "Sorry, something went wrong." }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: "Sorry, something went wrong." }]);
     } finally {
       setLoading(false);
     }
@@ -156,7 +193,7 @@ export default function DocChat() {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col font-sans">
-      <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+      <div className="chat-scroll flex-1 min-h-0 overflow-y-auto pr-1">
         {messages.map((m, i) => (
           <div key={i} className={`mb-5 flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             {m.role === "user" ? (

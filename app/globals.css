@@ -25,3 +25,35 @@ body {
     Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji",
     "Segoe UI Emoji", "Segoe UI Symbol";
 }
+
+/* Chat scrollbar should blend with page background instead of white track */
+.chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #6b7280 #f3f2ef;
+}
+
+.chat-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.chat-scroll::-webkit-scrollbar-track {
+  background: #f3f2ef;
+}
+
+.chat-scroll::-webkit-scrollbar-corner {
+  background: #f3f2ef;
+}
+
+.chat-scroll::-webkit-scrollbar-button {
+  background: #f3f2ef;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: #6b7280;
+  border-radius: 9999px;
+  border: 2px solid #f3f2ef;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
