@@ -1,4 +1,5 @@
 import DocChat from "@/components/DocChat";
+import IntroText from "@/components/IntroText";
 import Image from "next/image";
 
 export default function Home() {
@@ -13,9 +14,7 @@ export default function Home() {
           <h1 className="font-title text-5xl leading-none text-slate-900 sm:text-6xl lg:text-7xl">
             chat.bot
           </h1>
-          <p className="mt-6 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-            Tell us a little about what you need, then either type your reply or choose one of the options below.
-          </p>
+          <IntroText />
         </div>
 
         <div className="mt-auto w-full overflow-hidden pt-10">

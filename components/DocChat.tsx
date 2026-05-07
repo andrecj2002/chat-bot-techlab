@@ -19,8 +19,8 @@ export default function DocChat() {
   
   const showChoiceOptions = !loading && currentStep === 3;
   const firstUserLanguage = userOnlyMessages[0]?.content?.trim().toLowerCase() ?? "";
-  const isPortugueseFlow =
-    firstUserLanguage.includes("portugu") || firstUserLanguage.includes("pt");
+  const isEnglishFlow = firstUserLanguage.includes("english") || firstUserLanguage === "en";
+  const isPortugueseFlow = !isEnglishFlow;
   const detectAssistantWantsDetails = (text: string) => {
     return /\?|gostaria de esclarecer|gostaria de saber|poderia detalh|poderia esclarecer|pode esclarecer|pode detalh|poderia indicar|pode indicar|poderia dizer|pode dizer|por exemplo|poderia fornecer|pode fornecer|poderia clarificar|pode clarificar|mais detalhe|mais detalhes|poderia especificar/i.test(
       text,
@@ -35,14 +35,45 @@ export default function DocChat() {
     return hasLetterOptions || (hasBulletLines && mentionsOptions) || mentionsOptions;
   };
 
+  const detectAssistantRequestsLogistics = (text: string) => {
+    return /deadline|prazo|prazos|financ|orçamento|budget|equipa interna|internal team|timing|timeframe|schedule/i.test(text);
+  };
+
+  const detectAssistantRequestsContact = (text: string) => {
+    return /contacto|contato|contact|contact details|follow-up|email|telefone|telemóvel|phone/i.test(text);
+  };
+
+  const getStepFromAssistantReply = (reply: string, fallbackUserCount: number) => {
+    if (detectAssistantRequestsContact(reply)) return 6;
+    if (detectAssistantRequestsLogistics(reply)) return 5;
+    if (detectAssistantProvidedOptions(reply)) return 3;
+    if (detectAssistantWantsDetails(reply)) return 2;
+
+    if (fallbackUserCount >= 5) return 6;
+    if (fallbackUserCount >= 4) return 5;
+    if (fallbackUserCount >= 3) return 4;
+    return 1;
+  };
+
   const showInput = !(currentStep === 1 || currentStep === 3);
 
-  const steps = [
-    { label: "Língua", title: "Language" },
-    { label: "Empresa", title: "Company" },
-    { label: "Opções", title: "Options" },
-    { label: "Pedido", title: "Request" },
-  ];
+  const steps = isEnglishFlow
+    ? [
+        { label: "Language" },
+        { label: "Company" },
+        { label: "Options" },
+        { label: "Request" },
+        { label: "Logistics & Finance" },
+        { label: "Contact" },
+      ]
+    : [
+        { label: "Língua" },
+        { label: "Empresa" },
+        { label: "Opções" },
+        { label: "Pedido" },
+        { label: "Logística e Finanças" },
+        { label: "Contacto" },
+      ];
 
   const renderInlineBold = (text: string) => {
     const segments = text.split(/(\*\*[^*]+\*\*)/g);
@@ -147,6 +178,18 @@ export default function DocChat() {
     const lc = content.trim().toLowerCase();
     if (/^portugu(es|ês)?$|^pt$|^english$|^en$/i.test(lc)) {
       setStepIfHigher(2);
+      // Notify outer page about language choice so static intro can update
+      try {
+        if (typeof window !== "undefined") {
+          if (/^portugu(es|ês)?$|^pt$/i.test(lc)) {
+            window.dispatchEvent(new CustomEvent("language-changed", { detail: { lang: "pt" } }));
+          } else if (/^english$|^en$/i.test(lc)) {
+            window.dispatchEvent(new CustomEvent("language-changed", { detail: { lang: "en" } }));
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
     if (/^[a-d]$/i.test(content.trim())) {
       setStepIfHigher(4);
@@ -172,16 +215,14 @@ export default function DocChat() {
         setStepIfHigher(3);
       } else if (marker === "[AWAITING_REQUEST]") {
         setStepIfHigher(4);
+      } else if (marker === "[LOGISTICS_FINANCE_REQUEST]") {
+        setStepIfHigher(5);
+      } else if (marker === "[CONTACT_REQUEST]") {
+        setStepIfHigher(6);
       } else {
         // Fallback heuristics (best-effort)
-        if (detectAssistantWantsDetails(assistantReply)) {
-          setStepIfHigher(2);
-        } else if (detectAssistantProvidedOptions(assistantReply)) {
-          setStepIfHigher(3);
-        } else {
-          const userCount = updated.filter((m) => m.role === "user").length;
-          if (userCount >= 3) setStepIfHigher(4);
-        }
+        const userCount = updated.filter((m) => m.role === "user").length;
+        setStepIfHigher(getStepFromAssistantReply(assistantReply, userCount));
       }
     } catch (err) {
       console.error("sendMessage error:", err);
@@ -283,7 +324,7 @@ export default function DocChat() {
         </div>
       )}
 
-      <ol className="mt-10 flex w-full items-center gap-6 overflow-hidden px-0 py-0">
+      <ol className="mt-10 flex w-full items-stretch gap-6 overflow-hidden px-0 py-0">
         {steps.map((step, index) => {
           const stepNumber = index + 1;
           const isActive = currentStep === stepNumber;
@@ -293,12 +334,12 @@ export default function DocChat() {
           const titleColor = isActive || isComplete ? "text-slate-900" : "text-slate-500";
 
           return (
-            <li key={step.label} className="flex flex-1 items-start">
-              <div className={`flex w-full flex-col border-t-2 pt-4 ${lineColor}`}>
-                <span className={`text-sm font-medium sm:text-base ${labelColor}`}>
-                  Step {stepNumber}
+            <li key={step.label} className="flex flex-1 items-stretch">
+              <div className={`flex min-h-25 w-full flex-col border-t-2 pt-4 ${lineColor}`}>
+                <span className={`text-sm font-medium leading-5 sm:text-base ${labelColor}`}>
+                  {isEnglishFlow ? `Step ${stepNumber}` : `Passo ${stepNumber}`}
                 </span>
-                <h4 className={`text-base font-medium sm:text-lg ${titleColor}`}>
+                <h4 className={`text-base font-medium leading-6 sm:text-lg ${titleColor}`}>
                   {step.label}
                 </h4>
               </div>

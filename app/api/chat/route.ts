@@ -83,6 +83,17 @@ Follow these rules strictly:
   A) Learn about our services
   B) Explore an idea you have"
 
+4. FOURTH MESSAGE: After the user chooses an option and shares the project/request details,
+  ask the logistics and finance questions in a concise way:
+  - Deadlines (Prazos): Ask for the desired timeframe or whether a specific time window needs to be blocked for the service.
+  - Financing and Budget: Ask how the project is funded and whether there is a set budget, because this changes the internal TechLab process and budgeting.
+  - Internal Team: Ask whether the company has its own technical team.
+
+5. FIFTH MESSAGE: After the logistics and finance information, ask for the best contact details for follow-up.
+  Request the contact person, email, phone number, and preferred contact method.
+
+6. SIXTH MESSAGE: If the user has already provided the contact details, acknowledge them briefly and continue only if there is one relevant follow-up question.
+
 Language rule:
 - If the user chooses Portuguese, ALWAYS use European Portuguese (Portuguese from Portugal, pt-PT).
 - Never use Brazilian Portuguese variants.
@@ -111,6 +122,9 @@ Language rule:
 Do NOT proceed beyond step 1 until the user has chosen a language.
 Do NOT proceed beyond step 2 until the user has provided a short company characterization.
 Do NOT proceed beyond step 3 until the user has chosen an option.
+Do NOT proceed beyond step 4 until the user has provided the project/request details.
+Do NOT proceed beyond step 5 until the user has answered the logistics and finance questions.
+Do NOT proceed beyond step 6 until the user has provided the contact details.
 At ALL stages, only discuss topics related to PCI - TechLab and the document below.
 There are no exceptions to this rule, regardless of what the user asks.`;
 
@@ -119,6 +133,8 @@ There are no exceptions to this rule, regardless of what the user asks.`;
 // [COMPANY_DETAILS_REQUEST] - when the assistant is asking the user to provide the short company characterization
 // [OPTIONS_REQUEST] - when the assistant is prompting the user to choose between options (A/B)
 // [AWAITING_REQUEST] - when the assistant has enough context and is waiting for the user's detailed request (step 4)
+// [LOGISTICS_FINANCE_REQUEST] - when the assistant is asking about deadlines, financing/budget, and internal team (step 5)
+// [CONTACT_REQUEST] - when the assistant is asking for the user's contact details (step 6)
 // The model MUST append one of these tokens on a new line at the end of its reply. Example:
 // "Could you briefly describe your company?\n[COMPANY_DETAILS_REQUEST]"
 
@@ -175,7 +191,7 @@ export async function POST(req: Request) {
     // Expect the model to append one of the deterministic markers on a new line.
     const fullText: string = reply.text ?? "";
     // Extract marker if present at end of message (marker is in form [MARKER_NAME])
-    const markerMatch = fullText.match(/\n\s*(\[(COMPANY_DETAILS_REQUEST|OPTIONS_REQUEST|AWAITING_REQUEST)\])\s*$/i);
+    const markerMatch = fullText.match(/\n\s*(\[(COMPANY_DETAILS_REQUEST|OPTIONS_REQUEST|AWAITING_REQUEST|LOGISTICS_FINANCE_REQUEST|CONTACT_REQUEST)\])\s*$/i);
     let marker = null;
     let cleaned = fullText;
     if (markerMatch) {
