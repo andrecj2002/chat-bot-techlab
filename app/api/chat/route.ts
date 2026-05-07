@@ -87,7 +87,11 @@ Language rule:
 - If the user chooses Portuguese, ALWAYS use European Portuguese (Portuguese from Portugal, pt-PT).
 - Never use Brazilian Portuguese variants.
 - Prefer pt-PT vocabulary and style (for example: "equipa", "ficheiro", "telemóvel", "utilizador", "estúdio").
-
+Language rule:
+- When the user selects a language, accept that choice and use it for the rest of the conversation. Do NOT invite, suggest, or recommend switching languages. Do not warn the user about organizational language preferences.
+- If the user chooses Portuguese, ALWAYS use European Portuguese (Portuguese from Portugal, pt-PT) and never Brazilian variants.
+- If the user chooses English, continue in English without qualification or suggestion to switch.
+- Prefer pt-PT vocabulary and style when using Portuguese (for example: "equipa", "ficheiro", "telemóvel", "utilizador", "estúdio").
 4. FROM THERE:
   - If they choose A (services): answer very briefly and at a high level first
   - Before mentioning services, use the company characterization to identify the 1 to 3 most relevant service categories for that company
@@ -109,6 +113,15 @@ Do NOT proceed beyond step 2 until the user has provided a short company charact
 Do NOT proceed beyond step 3 until the user has chosen an option.
 At ALL stages, only discuss topics related to PCI - TechLab and the document below.
 There are no exceptions to this rule, regardless of what the user asks.`;
+
+// Deterministic output markers
+// At the END of every assistant message, on a NEW LINE, append exactly ONE of these tokens (no extra text):
+// [COMPANY_DETAILS_REQUEST] - when the assistant is asking the user to provide the short company characterization
+// [OPTIONS_REQUEST] - when the assistant is prompting the user to choose between options (A/B)
+// [AWAITING_REQUEST] - when the assistant has enough context and is waiting for the user's detailed request (step 4)
+// The model MUST append one of these tokens on a new line at the end of its reply. Example:
+// "Could you briefly describe your company?\n[COMPANY_DETAILS_REQUEST]"
+
 
 // Cracterização das respostas
 const RESPONSE_STYLE = `Response style:
@@ -159,7 +172,18 @@ export async function POST(req: Request) {
       return Response.json({ error: "Unexpected response type" }, { status: 500 });
     }
 
-    return Response.json({ reply: reply.text });
+    // Expect the model to append one of the deterministic markers on a new line.
+    const fullText: string = reply.text ?? "";
+    // Extract marker if present at end of message (marker is in form [MARKER_NAME])
+    const markerMatch = fullText.match(/\n\s*(\[(COMPANY_DETAILS_REQUEST|OPTIONS_REQUEST|AWAITING_REQUEST)\])\s*$/i);
+    let marker = null;
+    let cleaned = fullText;
+    if (markerMatch) {
+      marker = markerMatch[1];
+      cleaned = fullText.slice(0, markerMatch.index).trim();
+    }
+
+    return Response.json({ reply: cleaned, marker });
   } catch (err) {
     console.error("Chat API error:", err);
     const message = err instanceof Error ? err.message : String(err);

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 type Message = {
   role: "user" | "assistant";
@@ -9,6 +9,7 @@ type Message = {
 export default function DocChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentStep, setCurrentStep] = useState<number>(1);
+  const setStepIfHigher = (step: number) => setCurrentStep((prev) => Math.max(prev, step));
   const [input, setInput] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -108,7 +109,7 @@ export default function DocChat() {
     );
   };
 
-  const startConversation = async (): Promise<void> => {
+  const startConversation = useCallback(async (): Promise<void> => {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -117,15 +118,20 @@ export default function DocChat() {
       });
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data = await res.json();
-      setMessages([{ role: "assistant", content: data.reply ?? "" }]);
+      const assistantReply = data.reply ?? "";
+      const marker: string | null = data.marker ?? null;
+      setMessages([{ role: "assistant", content: assistantReply }]);
+      // initial assistant message should keep the flow at step 1 (language selection)
       setCurrentStep(1);
+      // If model unexpectedly requests company details immediately, honor marker
+      if (marker === "[COMPANY_DETAILS_REQUEST]") setStepIfHigher(2);
     } catch (err) {
       console.error("startConversation error:", err);
       setMessages([{ role: "assistant", content: "Sorry, something went wrong." }]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
   const sendMessageWithContent = async (content: string): Promise<void> => {
     if (!content.trim()) return;
 
@@ -140,10 +146,10 @@ export default function DocChat() {
     // immediate step transitions on user actions
     const lc = content.trim().toLowerCase();
     if (/^portugu(es|ês)?$|^pt$|^english$|^en$/i.test(lc)) {
-      setCurrentStep(2);
+      setStepIfHigher(2);
     }
     if (/^[a-d]$/i.test(content.trim())) {
-      setCurrentStep(4);
+      setStepIfHigher(4);
     }
 
     setLoading(true);
@@ -156,16 +162,26 @@ export default function DocChat() {
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data = await res.json();
       const assistantReply = data.reply ?? "";
+      const marker: string | null = data.marker ?? null;
       setMessages([...updated, { role: "assistant", content: assistantReply }]);
 
-      // adjust step based on assistant reply content
-      if (detectAssistantWantsDetails(assistantReply)) {
-        setCurrentStep(2);
-      } else if (detectAssistantProvidedOptions(assistantReply)) {
-        setCurrentStep(3);
+      // Prefer deterministic marker if provided by server/model
+      if (marker === "[COMPANY_DETAILS_REQUEST]") {
+        setStepIfHigher(2);
+      } else if (marker === "[OPTIONS_REQUEST]") {
+        setStepIfHigher(3);
+      } else if (marker === "[AWAITING_REQUEST]") {
+        setStepIfHigher(4);
       } else {
-        const userCount = updated.filter((m) => m.role === "user").length;
-        if (userCount >= 3) setCurrentStep(4);
+        // Fallback heuristics (best-effort)
+        if (detectAssistantWantsDetails(assistantReply)) {
+          setStepIfHigher(2);
+        } else if (detectAssistantProvidedOptions(assistantReply)) {
+          setStepIfHigher(3);
+        } else {
+          const userCount = updated.filter((m) => m.role === "user").length;
+          if (userCount >= 3) setStepIfHigher(4);
+        }
       }
     } catch (err) {
       console.error("sendMessage error:", err);
@@ -189,7 +205,7 @@ export default function DocChat() {
     }, 0);
 
     return () => clearTimeout(id);
-  }, []);
+  }, [startConversation]);
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col font-sans">
