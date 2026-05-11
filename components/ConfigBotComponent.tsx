@@ -376,13 +376,13 @@ export default function ConfigBotComponent() {
     <div className="flex h-full min-h-0 w-full flex-col font-sans">
       <div className="chat-scroll flex-1 min-h-0 overflow-y-auto pr-1">
         {messages.map((m, i) => (
-          <div key={i} className={`mb-5 flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+          <div key={i} className={`mb-2 sm:mb-4 flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             {m.role === "user" ? (
-              <div className="max-w-[78%] rounded-3xl rounded-tr-md bg-slate-900 px-4 py-3 text-base leading-7 text-white shadow-sm">
+              <div className="max-w-[85%] sm:max-w-[78%] rounded-3xl rounded-tr-md bg-slate-900 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base leading-6 sm:leading-7 text-white shadow-sm">
                 {m.content}
               </div>
             ) : (
-              <div className="max-w-[78%] rounded-3xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 text-base leading-7 text-slate-900 shadow-sm">
+              <div className="max-w-[85%] sm:max-w-[78%] rounded-3xl rounded-tl-md border border-slate-200 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base leading-6 sm:leading-7 text-slate-900 shadow-sm">
                 {renderAssistantContent(m.content)}
               </div>
             )}
@@ -394,18 +394,18 @@ export default function ConfigBotComponent() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="mt-8 mb-10 flex flex-wrap gap-3">
+      <div className="mt-3 sm:mt-8 mb-6 sm:mb-10 flex flex-wrap gap-2 sm:gap-3">
         {showLanguageOptions && (
           <>
             <button
               onClick={() => void sendMessageWithContent("Português")}
-              className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-900"
+              className="rounded-full border border-slate-300 bg-white px-2 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm font-medium text-slate-900 transition hover:border-slate-900"
             >
               Português
             </button>
             <button
               onClick={() => void sendMessageWithContent("English")}
-              className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-900 transition hover:border-slate-900"
+              className="rounded-full border border-slate-300 bg-white px-2 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm font-medium text-slate-900 transition hover:border-slate-900"
             >
               English
             </button>
@@ -416,13 +416,13 @@ export default function ConfigBotComponent() {
           <>
             <button
               onClick={() => void sendMessageWithContent("A")}
-              className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+              className="rounded-full border border-slate-300 bg-white px-2 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
             >
               {isPortugueseFlow ? "A) Conhecer os nossos serviços" : "A) Learn about our services"}
             </button>
             <button
               onClick={() => void sendMessageWithContent("B")}
-              className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+              className="rounded-full border border-slate-300 bg-white px-2 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
             >
               {isPortugueseFlow ? "B) Explorar uma ideia que tem" : "B) Explore an idea you have"}
             </button>
@@ -431,24 +431,24 @@ export default function ConfigBotComponent() {
       </div>
 
       {showInput && (
-        <div className="flex items-end gap-4 border-b border-slate-300 pb-3">
+        <div className="flex items-end gap-2 sm:gap-4 border-b border-slate-300 pb-2 sm:pb-3">
           <input
             value={input}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
             onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && sendMessage()}
             placeholder="Write a reply..."
-            className="flex-1 bg-transparent px-0 py-2 text-base text-slate-900 outline-none placeholder:text-slate-400"
+            className="flex-1 bg-transparent px-0 py-1 sm:py-2 text-xs sm:text-base text-slate-900 outline-none placeholder:text-slate-400"
           />
           <button
             onClick={sendMessage}
-            className="text-2xl leading-none text-slate-900 transition hover:text-slate-600"
+            className="text-lg sm:text-2xl leading-none text-slate-900 transition hover:text-slate-600 pb-0.5 sm:pb-1"
           >
             →
           </button>
         </div>
       )}
 
-      <ol className="mt-10 flex w-full items-stretch gap-6 overflow-hidden px-0 py-0">
+      <ol className="mt-3 sm:mt-10 flex w-full items-stretch gap-1.5 sm:gap-6 overflow-hidden px-0 py-0">
         {steps.map((step, index) => {
           const stepNumber = index + 1;
           const isActive = currentStep === stepNumber;
@@ -459,11 +459,11 @@ export default function ConfigBotComponent() {
 
           return (
             <li key={step.label} className="flex flex-1 items-stretch">
-              <div className={`flex min-h-25 w-full flex-col border-t-2 pt-4 ${lineColor}`}>
-                <span className={`text-sm font-medium leading-5 sm:text-base ${labelColor}`}>
-                  {isEnglishFlow ? `Step ${stepNumber}` : `Passo ${stepNumber}`}
+              <div className={`flex min-h-12 sm:min-h-25 w-full flex-col border-t-2 pt-1 sm:pt-4 px-0.5 sm:px-0 ${lineColor}`}>
+                <span className={`text-xs sm:text-sm font-medium leading-3 sm:leading-5 ${labelColor}`}>
+                  {isEnglishFlow ? `S${stepNumber}` : `P${stepNumber}`}
                 </span>
-                <h4 className={`text-base font-medium leading-6 sm:text-lg ${titleColor}`}>
+                <h4 className={`hidden sm:block text-sm sm:text-base md:text-lg font-medium leading-5 sm:leading-6 ${titleColor}`}>
                   {step.label}
                 </h4>
               </div>

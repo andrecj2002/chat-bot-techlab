@@ -129,26 +129,26 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
       {/* Button to open modal */}
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-900 hover:bg-slate-50"
+        className="flex items-center gap-1 sm:gap-2 rounded-full border border-slate-300 bg-white px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-900 transition hover:border-slate-900 hover:bg-slate-50"
         title={language === "pt" ? "Ver conversas dos últimos 48 horas" : "View chats from last 48 hours"}
       >
-        <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7m18 0a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1m18 0-7.72 6.433a2 2 0 0 1-2.56 0L3 7"/></svg>
+        <svg className="h-3 sm:h-5 w-3 sm:w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7m18 0a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1m18 0-7.72 6.433a2 2 0 0 1-2.56 0L3 7"/></svg>
         {language === "pt" ? "Últimas Conversas" : "Latest Chats"}
       </button>
 
       {/* Modal overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4"
           onClick={() => setIsOpen(false)}
         >
           <div 
-            className="h-[60vh] w-full max-w-4xl rounded-lg bg-white shadow-lg flex flex-col"
+            className="h-[70vh] sm:h-[60vh] w-full max-w-4xl rounded-lg bg-white shadow-lg flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal header */}
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <h2 className="text-lg font-semibold text-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-200 px-3 sm:px-6 py-2 sm:py-4">
+              <h2 className="text-sm sm:text-lg font-semibold text-slate-900">
                 {language === "pt" ? "Últimas Conversas" : "Latest Chats"}
               </h2>
               <button
@@ -156,7 +156,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
                 className="rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
               >
                 <svg
-                  className="h-6 w-6"
+                  className="h-4 sm:h-6 w-4 sm:w-6"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -172,7 +172,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
             </div>
 
             {/* Modal content */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+            <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-2 sm:py-4">
               {loading ? (
                 <div className="flex items-center justify-center h-full">
                   <p className="text-sm text-slate-500">{language === "pt" ? "Carregando conversas..." : "Loading chats..."}</p>
@@ -184,17 +184,17 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-1.5 sm:space-y-3">
                   {cachedChats.map((chat) => (
                     <button
                       key={chat.id}
                       onClick={() => handleLoadChat(chat)}
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-left transition hover:bg-slate-100 hover:border-slate-300"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2 sm:p-3 text-left transition hover:bg-slate-100 hover:border-slate-300"
                     >
-                      <div className="text-sm font-medium text-slate-900 truncate">
+                      <div className="text-xs sm:text-sm font-medium text-slate-900 truncate">
                         {chat.title}
                       </div>
-                      <div className="text-xs text-slate-500 mt-1 flex justify-between">
+                      <div className="text-xs text-slate-500 mt-0.5 sm:mt-1 flex justify-between">
                         <span>{getMessageCount(chat.messages)} {language === "pt" ? "mensagens" : "messages"}</span>
                         <span>{formatDate(chat.timestamp)}</span>
                       </div>
@@ -206,10 +206,10 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
 
             {/* Modal footer */}
             {cachedChats.length > 0 && (
-              <div className="border-t border-slate-200 px-6 py-3 flex justify-end">
+              <div className="border-t border-slate-200 px-3 sm:px-6 py-2 sm:py-3 flex justify-end">
                 <button
                   onClick={clearHistory}
-                  className="text-sm text-red-600 hover:text-red-700 hover:underline transition font-medium"
+                  className="text-xs sm:text-sm text-red-600 hover:text-red-700 hover:underline transition font-medium"
                 >
                   {language === "pt" ? "Limpar Histórico" : "Clear History"}
                 </button>

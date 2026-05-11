@@ -21,7 +21,7 @@ export default function IntroTextoBotComponent() {
   };
 
   return (
-    <p className="mt-6 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
+    <p className="mt-2 sm:mt-6 max-w-2xl text-xs sm:text-base leading-5 sm:leading-7 text-slate-700 md:text-lg">
       {texts[lang]}
     </p>
   );

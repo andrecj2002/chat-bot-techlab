@@ -66,13 +66,21 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-white text-slate-900">
-      <header className="flex items-center justify-between px-6 py-4 gap-3">
-        <Image src="/pci_logo.svg" alt="PCI TechLab logo" width={112} height={28} className="h-7 w-auto" />
-        <div className="flex gap-3">
+    <>
+      <style>{`
+        @media (min-width: 768px) {
+          .gradient-bg {
+            background: linear-gradient(to right, rgb(253, 252, 255) 0%, white 20%, white 80%, rgb(253, 252, 255) 100%) !important;
+          }
+        }
+      `}</style>
+      <div className="h-screen overflow-hidden text-slate-900 bg-white gradient-bg">
+      <header className="flex flex-col sm:flex-row items-center justify-between px-3 sm:px-6 py-2 sm:py-4 gap-2 sm:gap-3">
+        <Image src="/pci_logo.svg" alt="PCI TechLab logo" width={112} height={28} className="h-5 sm:h-7 w-auto" />
+        <div className="flex gap-1.5 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={handleSaveClick}
-            className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+            className={`rounded-full border px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition flex-1 sm:flex-none ${
               !hasChatMessages || chatSaved
                 ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
                 : "border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 hover:border-indigo-700 cursor-pointer"
@@ -106,18 +114,19 @@ export default function Home() {
         </div>
       )}
 
-      <main className="mx-auto flex h-[calc(100vh-72px)] w-full max-w-5xl flex-col overflow-hidden px-6 pt-12 pb-10 lg:px-10">
-        <div className="max-w-3xl">
-          <h1 className="font-title text-5xl leading-none text-slate-900 sm:text-6xl lg:text-7xl">
+      <main className="mx-auto flex h-[calc(100vh-80px)] sm:h-[calc(100vh-72px)] w-full max-w-5xl flex-col overflow-hidden px-3 sm:px-6 pt-2 sm:pt-12 pb-2 sm:pb-10 lg:px-10">
+        <div className="max-w-3xl w-full">
+          <h1 className="font-title text-2xl sm:text-5xl leading-tight sm:leading-none text-slate-900 md:text-6xl lg:text-7xl">
             chat.bot
           </h1>
           <IntroTextoBotComponent />
         </div>
 
-        <div className="mt-auto w-full overflow-hidden pt-10">
+        <div className="mt-auto w-full overflow-hidden pt-6 sm:pt-10">
           <ConfigBotComponent />
         </div>
       </main>
     </div>
+    </>
   );
 }
