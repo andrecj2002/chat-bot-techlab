@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 
-export default function IntroText() {
+export default function IntroTextoBotComponent() {
   const [lang, setLang] = useState<"pt" | "en">("pt");
 
   useEffect(() => {

@@ -6,7 +6,7 @@ type Message = {
   content: string;
 };
 
-export default function DocChat() {
+export default function ConfigBotComponent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentStep, setCurrentStep] = useState<number>(1);
   const setStepIfHigher = (step: number) => setCurrentStep((prev) => Math.max(prev, step));

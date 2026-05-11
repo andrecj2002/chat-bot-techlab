@@ -1,5 +1,5 @@
-import DocChat from "@/components/DocChat";
-import IntroText from "@/components/IntroText";
+import ConfigBotComponent from "@/components/ConfigBotComponent";
+import IntroTextoBotComponent from "@/components/IntroTextoBotComponent";
 import Image from "next/image";
 
 export default function Home() {
@@ -14,11 +14,11 @@ export default function Home() {
           <h1 className="font-title text-5xl leading-none text-slate-900 sm:text-6xl lg:text-7xl">
             chat.bot
           </h1>
-          <IntroText />
+          <IntroTextoBotComponent />
         </div>
 
         <div className="mt-auto w-full overflow-hidden pt-10">
-          <DocChat />
+          <ConfigBotComponent />
         </div>
       </main>
     </div>
