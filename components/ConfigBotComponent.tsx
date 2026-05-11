@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useChatCache } from "./cacheOldChatsBotComponent";
 
 type Message = {
   role: "user" | "assistant";
@@ -13,6 +14,9 @@ export default function ConfigBotComponent() {
   const [input, setInput] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { saveChat } = useChatCache();
+  const [chatSaved, setChatSaved] = useState<boolean>(false);
+  const [savedMessageCount, setSavedMessageCount] = useState<number>(0);
 
   const userOnlyMessages = messages.filter((m) => m.role === "user");
   const showLanguageOptions = messages.length === 1 && messages[0]?.role === "assistant";
@@ -154,6 +158,8 @@ export default function ConfigBotComponent() {
       setMessages([{ role: "assistant", content: assistantReply }]);
       // initial assistant message should keep the flow at step 1 (language selection)
       setCurrentStep(1);
+      setChatSaved(false); // Allow saving new conversations
+      setSavedMessageCount(0); // Reset saved message count
       // If model unexpectedly requests company details immediately, honor marker
       if (marker === "[COMPANY_DETAILS_REQUEST]") setStepIfHigher(2);
     } catch (err) {
@@ -163,6 +169,46 @@ export default function ConfigBotComponent() {
       setLoading(false);
     }
   }, []);
+
+  // Listen for cached chat load events
+  useEffect(() => {
+    const handleLoadCachedChat = (event: any) => {
+      const { messages } = event.detail;
+      setMessages(messages);
+      setCurrentStep(1);
+      setInput("");
+      setChatSaved(true); // Mark as saved initially
+      setSavedMessageCount(messages.length); // Track the message count of the loaded chat
+    };
+
+    window.addEventListener("load-cached-chat", handleLoadCachedChat);
+    return () => window.removeEventListener("load-cached-chat", handleLoadCachedChat);
+  }, []);
+
+  // Reset chatSaved when messages change (allows re-saving after saving)
+  useEffect(() => {
+    if (chatSaved && messages.length > savedMessageCount) {
+      // New messages have been added after saving, allow re-saving
+      setChatSaved(false);
+    }
+  }, [messages.length, chatSaved, savedMessageCount]);
+
+  // Notify parent about chat state changes
+  useEffect(() => {
+    const hasMessages = messages.length > 1;
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("chat-state-changed", {
+          detail: {
+            hasMessages,
+            isSaved: chatSaved,
+            savedMessageCount,
+          },
+        })
+      );
+    }
+  }, [messages.length, chatSaved, savedMessageCount]);
+
   const sendMessageWithContent = async (content: string): Promise<void> => {
     if (!content.trim()) return;
 
@@ -247,6 +293,70 @@ export default function ConfigBotComponent() {
 
     return () => clearTimeout(id);
   }, [startConversation]);
+
+  // Generate title from chat content
+  const generateChatTitle = async (chatMessages: Message[]): Promise<string> => {
+    try {
+      const userMessages = chatMessages.filter((m) => m.role === "user");
+      if (userMessages.length === 0) return "New Chat";
+
+      // Use the first user message as a basis for the title
+      const firstUserMessage = userMessages[0].content;
+      const firstWords = firstUserMessage.split(" ").slice(0, 5).join(" ");
+      
+      // Try to get AI to generate a better title
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: "user",
+                content: `Generate a short, concise title (3-6 words) for a chat that starts with: "${firstUserMessage}". Only respond with the title, nothing else.`,
+              },
+            ],
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const title = data.reply?.trim() || firstWords;
+          return title.substring(0, 50); // Limit to 50 chars
+        }
+      } catch {
+        // Fallback to first message words
+      }
+
+      return firstWords.substring(0, 50);
+    } catch {
+      return "New Chat";
+    }
+  };
+
+  // Manual save function
+  const handleSaveChat = async () => {
+    if (messages.length === 0) return;
+    
+    const title = await generateChatTitle(messages);
+    saveChat(messages, title);
+    setChatSaved(true);
+    setSavedMessageCount(messages.length); // Track message count at save time
+    
+    // Dispatch event to show notification
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("chat-saved-success"));
+    }
+  };
+
+  // Listen for save chat event from header
+  useEffect(() => {
+    const handleSaveEvent = () => {
+      void handleSaveChat();
+    };
+
+    window.addEventListener("save-current-chat", handleSaveEvent);
+    return () => window.removeEventListener("save-current-chat", handleSaveEvent);
+  }, [messages]);
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col font-sans">
