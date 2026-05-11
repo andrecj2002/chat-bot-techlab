@@ -175,10 +175,24 @@ export default function ConfigBotComponent() {
     const handleLoadCachedChat = (event: any) => {
       const { messages } = event.detail;
       setMessages(messages);
-      setCurrentStep(1);
       setInput("");
       setChatSaved(true); // Mark as saved initially
       setSavedMessageCount(messages.length); // Track the message count of the loaded chat
+
+      // Calculate the correct step based on the loaded conversation
+      const lastAssistantMessage = messages
+        .slice()
+        .reverse()
+        .find((m) => m.role === "assistant");
+      
+      const userCount = messages.filter((m) => m.role === "user").length;
+      
+      if (lastAssistantMessage) {
+        const calculatedStep = getStepFromAssistantReply(lastAssistantMessage.content, userCount);
+        setCurrentStep(calculatedStep);
+      } else {
+        setCurrentStep(4); // Default to step 4 if no assistant message
+      }
     };
 
     window.addEventListener("load-cached-chat", handleLoadCachedChat);
