@@ -132,6 +132,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
         className="flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:border-slate-900 hover:bg-slate-50"
         title={language === "pt" ? "Ver conversas dos últimos 48 horas" : "View chats from last 48 hours"}
       >
+        <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7m18 0a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1m18 0-7.72 6.433a2 2 0 0 1-2.56 0L3 7"/></svg>
         {language === "pt" ? "Últimas Conversas" : "Latest Chats"}
       </button>
 

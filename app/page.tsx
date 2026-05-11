@@ -66,7 +66,7 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-[#f3f2ef] text-slate-900">
+    <div className="h-screen overflow-hidden bg-white text-slate-900">
       <header className="flex items-center justify-between px-6 py-4 gap-3">
         <Image src="/pci_logo.svg" alt="PCI TechLab logo" width={112} height={28} className="h-7 w-auto" />
         <div className="flex gap-3">
