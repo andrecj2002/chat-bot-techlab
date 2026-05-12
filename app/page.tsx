@@ -12,6 +12,8 @@ export default function Home() {
   const [savedMessageCount, setSavedMessageCount] = useState(0);
   const [showSaveNotification, setShowSaveNotification] = useState(false);
   const [showErrorNotification, setShowErrorNotification] = useState(false);
+  const [exitSaveNotification, setExitSaveNotification] = useState(false);
+  const [exitErrorNotification, setExitErrorNotification] = useState(false);
 
   useEffect(() => {
     const handleLanguageChange = (event: any) => {
@@ -34,9 +36,13 @@ export default function Home() {
     };
 
     const handleChatSavedSuccess = () => {
+      setExitSaveNotification(false);
       setShowSaveNotification(true);
       const timer = setTimeout(() => {
-        setShowSaveNotification(false);
+        setExitSaveNotification(true);
+        setTimeout(() => {
+          setShowSaveNotification(false);
+        }, 400);
       }, 3000);
       return () => clearTimeout(timer);
     };
@@ -54,9 +60,13 @@ export default function Home() {
   const handleSaveClick = () => {
     // Check if save is allowed
     if (!hasChatMessages || chatSaved) {
+      setExitErrorNotification(false);
       setShowErrorNotification(true);
       setTimeout(() => {
-        setShowErrorNotification(false);
+        setExitErrorNotification(true);
+        setTimeout(() => {
+          setShowErrorNotification(false);
+        }, 400);
       }, 3000);
       return;
     }
@@ -72,6 +82,44 @@ export default function Home() {
           .gradient-bg {
             background: linear-gradient(to right, rgb(253, 252, 255) 0%, white 20%, white 80%, rgb(253, 252, 255) 100%) !important;
           }
+        }
+        @keyframes slideInDown {
+          from {
+            opacity: 0;
+            transform: translateY(-1rem);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .notification-enter {
+          animation: slideInDown 0.4s ease-out forwards;
+        }
+        @keyframes slideOutUp {
+          from {
+            opacity: 1;
+            transform: translateY(0);
+          }
+          to {
+            opacity: 0;
+            transform: translateY(-1rem);
+          }
+        }
+        .notification-exit {
+          animation: slideOutUp 0.4s ease-in forwards;
+        }
+        @keyframes progressBarAnimation {
+          from {
+            transform: scaleX(1);
+          }
+          to {
+            transform: scaleX(0);
+          }
+        }
+        .progress-bar {
+          animation: progressBarAnimation 3s linear forwards;
+          transform-origin: left;
         }
       `}</style>
       <div className="h-screen overflow-hidden text-slate-900 bg-white gradient-bg">
@@ -94,22 +142,24 @@ export default function Home() {
 
       {/* Save notification */}
       {showSaveNotification && (
-        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-40 animate-in fade-in slide-in-from-top-2 duration-300 w-full max-w-md px-4">
-          <div className="p-4 text-sm text-emerald-700 rounded-lg bg-emerald-50 border border-emerald-200" role="alert">
+        <div className={`fixed top-6 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-md px-4 ${exitSaveNotification ? "notification-exit" : "notification-enter"}`}>
+          <div className="relative p-4 text-sm text-emerald-700 rounded-lg bg-emerald-50 border border-emerald-200 overflow-hidden" role="alert">
             <span className="font-medium">
               {language === "pt" ? "A conversa foi guardada!" : "Chat has been saved!"}
             </span>
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600 progress-bar" />
           </div>
         </div>
       )}
 
       {/* Error notification */}
       {showErrorNotification && (
-        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-40 animate-in fade-in slide-in-from-top-2 duration-300 w-full max-w-md px-4">
-          <div className="p-4 text-sm text-amber-700 rounded-lg bg-amber-50 border border-amber-200" role="alert">
+        <div className={`fixed top-6 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-md px-4 ${exitErrorNotification ? "notification-exit" : "notification-enter"}`}>
+          <div className="relative p-4 text-sm text-amber-700 rounded-lg bg-amber-50 border border-amber-200 overflow-hidden" role="alert">
             <span className="font-medium">
               {language === "pt" ? "Nenhum progresso na conversa desde o último guardado" : "No progress in the conversation since the last save"}
             </span>
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600 progress-bar" />
           </div>
         </div>
       )}

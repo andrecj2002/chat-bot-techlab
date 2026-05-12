@@ -17,6 +17,7 @@ export default function ConfigBotComponent() {
   const { saveChat } = useChatCache();
   const [chatSaved, setChatSaved] = useState<boolean>(false);
   const [savedMessageCount, setSavedMessageCount] = useState<number>(0);
+  const [userChoice, setUserChoice] = useState<"A" | "B" | null>(null);
 
   const userOnlyMessages = messages.filter((m) => m.role === "user");
   const showLanguageOptions = messages.length === 1 && messages[0]?.role === "assistant";
@@ -59,6 +60,7 @@ export default function ConfigBotComponent() {
     return 1;
   };
 
+  // DURANTE AS OPÇÕES E PEDIDO, ESCONDER INPUT PARA FORÇAR CLIQUE (EVITA RESPOSTAS LIVRES NESSA FASE)
   const showInput = !(currentStep === 1 || currentStep === 3);
 
   const steps = isEnglishFlow
@@ -79,6 +81,23 @@ export default function ConfigBotComponent() {
         { label: "Contacto" },
       ];
 
+  // Get the steps that should be displayed based on user choice
+  const getDisplayedSteps = () => {
+    const baseSteps = steps.slice(0, 3);
+    if (!userChoice) return baseSteps;
+    if (userChoice === "A") return steps;
+    if (userChoice === "B") {
+      return [
+        ...baseSteps,
+        { label: isEnglishFlow ? "Brainstorming" : "Brainstorming" },
+      ];
+    }
+    return baseSteps;
+  };
+
+  const displayedSteps = getDisplayedSteps();
+
+      // FORMATAÇÃO DE TEXTO DO BOT
   const renderInlineBold = (text: string) => {
     const segments = text.split(/(\*\*[^*]+\*\*)/g);
 
@@ -95,6 +114,7 @@ export default function ConfigBotComponent() {
     });
   };
 
+  // RENDERIZAÇÃO DO TEXTO DO BOT PARA BOLD E LISTAS
   const renderAssistantContent = (content: string) => {
     const normalized = content
       .replace(/\r/g, "")
@@ -223,6 +243,21 @@ export default function ConfigBotComponent() {
     }
   }, [messages.length, chatSaved, savedMessageCount]);
 
+  // Warn user before leaving page if there are unsaved messages
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const hasUnsavedMessages = messages.length > 1 && !chatSaved;
+      if (hasUnsavedMessages) {
+        e.preventDefault();
+        e.returnValue = "";
+        return "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [messages.length, chatSaved]);
+
   const sendMessageWithContent = async (content: string): Promise<void> => {
     if (!content.trim()) return;
 
@@ -252,6 +287,8 @@ export default function ConfigBotComponent() {
       }
     }
     if (/^[a-d]$/i.test(content.trim())) {
+      const choice = content.trim().toUpperCase() as "A" | "B";
+      setUserChoice(choice);
       setStepIfHigher(4);
     }
 
@@ -372,6 +409,17 @@ export default function ConfigBotComponent() {
     return () => window.removeEventListener("save-current-chat", handleSaveEvent);
   }, [messages]);
 
+  // Auto-save chat when step exceeds 3
+  useEffect(() => {
+    const autoSaveChat = async () => {
+      if (currentStep > 3 && messages.length > 0 && !chatSaved) {
+        await handleSaveChat();
+      }
+    };
+
+    void autoSaveChat();
+  }, [currentStep, messages.length, chatSaved, handleSaveChat]);
+
   return (
     <div className="flex h-full min-h-0 w-full flex-col font-sans">
       <div className="chat-scroll flex-1 min-h-0 overflow-y-auto pr-1">
@@ -449,16 +497,20 @@ export default function ConfigBotComponent() {
       )}
 
       <ol className="mt-3 sm:mt-10 flex w-full items-stretch gap-1.5 sm:gap-6 overflow-hidden px-0 py-0">
-        {steps.map((step, index) => {
+        {displayedSteps.map((step, index) => {
           const stepNumber = index + 1;
           const isActive = currentStep === stepNumber;
           const isComplete = currentStep > stepNumber;
           const lineColor = isComplete || isActive ? "border-indigo-600" : "border-slate-200";
           const labelColor = isComplete || isActive ? "text-indigo-600" : "text-slate-400";
           const titleColor = isActive || isComplete ? "text-slate-900" : "text-slate-500";
+          
+          // Add animation for steps that appear after choice
+          const shouldAnimate = userChoice && stepNumber > 3;
+          const animationClass = shouldAnimate ? "animate-in fade-in zoom-in-95 duration-700" : "";
 
           return (
-            <li key={step.label} className="flex flex-1 items-stretch">
+            <li key={step.label} className={`flex flex-1 items-stretch ${animationClass}`}>
               <div className={`flex min-h-12 sm:min-h-25 w-full flex-col border-t-2 pt-1 sm:pt-4 px-0.5 sm:px-0 ${lineColor}`}>
                 <span className={`text-xs sm:text-sm font-medium leading-3 sm:leading-5 ${labelColor}`}>
                   {isEnglishFlow ? `S${stepNumber}` : `P${stepNumber}`}

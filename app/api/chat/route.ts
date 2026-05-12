@@ -138,7 +138,6 @@ There are no exceptions to this rule, regardless of what the user asks.`;
 // The model MUST append one of these tokens on a new line at the end of its reply. Example:
 // "Could you briefly describe your company?\n[COMPANY_DETAILS_REQUEST]"
 
-
 // Cracterização das respostas
 const RESPONSE_STYLE = `Response style:
 - Keep answers short, clear, and concise.
