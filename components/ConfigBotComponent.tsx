@@ -95,10 +95,8 @@ export default function ConfigBotComponent() {
     if (!userChoice) return baseSteps;
     if (userChoice === "A") return steps;
     if (userChoice === "B") {
-      return [
-        ...baseSteps,
-        { label: isEnglishFlow ? "Brainstorming" : "Brainstorming" },
-      ];
+      // Route B: Show all 6 steps upfront so user can see the full journey
+      return steps;
     }
     return baseSteps;
   };
