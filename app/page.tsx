@@ -7,73 +7,17 @@ import { useState, useEffect } from "react";
 
 export default function Home() {
   const [language, setLanguage] = useState<"pt" | "en">("pt");
-  const [hasChatMessages, setHasChatMessages] = useState(false);
-  const [chatSaved, setChatSaved] = useState(false);
-  const [savedMessageCount, setSavedMessageCount] = useState(0);
-  const [showSaveNotification, setShowSaveNotification] = useState(false);
-  const [showErrorNotification, setShowErrorNotification] = useState(false);
-  const [exitSaveNotification, setExitSaveNotification] = useState(false);
-  const [exitErrorNotification, setExitErrorNotification] = useState(false);
 
   useEffect(() => {
     const handleLanguageChange = (event: any) => {
       setLanguage(event.detail?.lang || "pt");
     };
 
-    const handleChatStateChange = (event: any) => {
-      const newHasMessages = event.detail?.hasMessages || false;
-      const newChatSaved = event.detail?.isSaved || false;
-      const newSavedMessageCount = event.detail?.savedMessageCount || 0;
-      
-      setHasChatMessages(newHasMessages);
-      setChatSaved(newChatSaved);
-      setSavedMessageCount(newSavedMessageCount);
-      
-      // Clear error notification if conditions now allow saving
-      if (newHasMessages && !newChatSaved) {
-        setShowErrorNotification(false);
-      }
-    };
-
-    const handleChatSavedSuccess = () => {
-      setExitSaveNotification(false);
-      setShowSaveNotification(true);
-      const timer = setTimeout(() => {
-        setExitSaveNotification(true);
-        setTimeout(() => {
-          setShowSaveNotification(false);
-        }, 400);
-      }, 3000);
-      return () => clearTimeout(timer);
-    };
-
     window.addEventListener("language-changed", handleLanguageChange);
-    window.addEventListener("chat-state-changed", handleChatStateChange);
-    window.addEventListener("chat-saved-success", handleChatSavedSuccess);
     return () => {
       window.removeEventListener("language-changed", handleLanguageChange);
-      window.removeEventListener("chat-state-changed", handleChatStateChange);
-      window.removeEventListener("chat-saved-success", handleChatSavedSuccess);
     };
   }, []);
-
-  const handleSaveClick = () => {
-    // Check if save is allowed
-    if (!hasChatMessages || chatSaved) {
-      setExitErrorNotification(false);
-      setShowErrorNotification(true);
-      setTimeout(() => {
-        setExitErrorNotification(true);
-        setTimeout(() => {
-          setShowErrorNotification(false);
-        }, 400);
-      }, 3000);
-      return;
-    }
-    
-    // Save is allowed, dispatch event
-    window.dispatchEvent(new CustomEvent("save-current-chat"));
-  };
 
   return (
     <>
@@ -126,43 +70,9 @@ export default function Home() {
       <header className="flex flex-col sm:flex-row items-center justify-between px-3 sm:px-6 py-2 sm:py-4 gap-2 sm:gap-3">
         <Image src="/pci_logo.svg" alt="PCI TechLab logo" width={112} height={28} className="h-5 sm:h-7 w-auto" />
         <div className="flex gap-1.5 sm:gap-3 w-full sm:w-auto">
-          <button
-            onClick={handleSaveClick}
-            className={`rounded-full border px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition flex-1 sm:flex-none ${
-              !hasChatMessages || chatSaved
-                ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-                : "border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 hover:border-indigo-700 cursor-pointer"
-            }`}
-          >
-            {language === "pt" ? "Guardar Conversa" : "Save Chat"}
-          </button>
           <CacheOldChatsBotComponent onLoadChat={() => {}} />
         </div>
       </header>
-
-      {/* Save notification */}
-      {showSaveNotification && (
-        <div className={`fixed top-6 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-md px-4 ${exitSaveNotification ? "notification-exit" : "notification-enter"}`}>
-          <div className="relative p-4 text-sm text-emerald-700 rounded-lg bg-emerald-50 border border-emerald-200 overflow-hidden" role="alert">
-            <span className="font-medium">
-              {language === "pt" ? "A conversa foi guardada!" : "Chat has been saved!"}
-            </span>
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600 progress-bar" />
-          </div>
-        </div>
-      )}
-
-      {/* Error notification */}
-      {showErrorNotification && (
-        <div className={`fixed top-6 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-md px-4 ${exitErrorNotification ? "notification-exit" : "notification-enter"}`}>
-          <div className="relative p-4 text-sm text-amber-700 rounded-lg bg-amber-50 border border-amber-200 overflow-hidden" role="alert">
-            <span className="font-medium">
-              {language === "pt" ? "Nenhum progresso na conversa desde o último guardado" : "No progress in the conversation since the last save"}
-            </span>
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600 progress-bar" />
-          </div>
-        </div>
-      )}
 
       <main className="mx-auto flex h-[calc(100vh-80px)] sm:h-[calc(100vh-72px)] w-full max-w-5xl flex-col overflow-hidden px-3 sm:px-6 pt-2 sm:pt-12 pb-2 sm:pb-10 lg:px-10">
         <div className="max-w-3xl w-full">

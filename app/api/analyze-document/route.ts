@@ -15,58 +15,32 @@ type AnalyzeDocumentRequest = {
 
 function getAnalysisPrompt(userChoice: "A" | "B", language: "en" | "pt"): string {
   if (language === "pt") {
-    const basePrompt = `Por favor, analise este documento PDF e forneça um resumo estruturado do que compreendeu. A resposta deve ser concisa e incluir:
-
-1. **Resumo da ideia/proposta**: O que é a ideia/proposta apresentada?
-2. **Objetivo principal**: Qual é o objetivo principal?
-3. **Público-alvo ou contexto**: Para quem ou em que contexto se aplica?
-4. **Elementos-chave**: Quais são os pontos-chave mencionados?`;
+    const basePrompt = `Analise este documento em 2-3 frases apenas:
+1. **Resumo**: O que é?
+2. **Objetivo principal**: Qual é o objetivo?`;
 
     if (userChoice === "A") {
-      return (
-        basePrompt +
-        `
+      return basePrompt + `
 
-Contexto: Este é um pedido em que o utilizador quer conhecer os serviços da PCI - TechLab que se alinham com a sua proposta/ideia.
-
-Termine com uma observação sobre quais os serviços da PCI - TechLab que seriam mais relevantes baseado no documento.`
-      );
+Que serviços da PCI-TechLab se alinham com isto?`;
     } else {
-      return (
-        basePrompt +
-        `
+      return basePrompt + `
 
-Contexto: Este é um pedido em que o utilizador quer explorar e desenvolver uma ideia que tem, e gostaria de ajuda para a melhorar.
-
-Termine com sugestões de como esta ideia poderia ser expandida ou melhorada.`
-      );
+Como poderia ser melhorado?`;
     }
   } else {
-    const basePrompt = `Please analyze this PDF document and provide a structured summary of what you understand. The response should be concise and include:
-
-1. **Idea/Proposal Summary**: What is the idea or proposal presented?
-2. **Main Objective**: What is the main objective?
-3. **Target Audience or Context**: Who is it for or in what context does it apply?
-4. **Key Elements**: What are the key points mentioned?`;
+    const basePrompt = `Analyze this document in 2-3 sentences only:
+1. **Summary**: What is it?
+2. **Main Objective**: What's the goal?`;
 
     if (userChoice === "A") {
-      return (
-        basePrompt +
-        `
+      return basePrompt + `
 
-Context: This is a request where the user wants to learn about PCI - TechLab services that align with their proposal/idea.
-
-End with an observation about which PCI - TechLab services would be most relevant based on the document.`
-      );
+Which PCI-TechLab services align with this?`;
     } else {
-      return (
-        basePrompt +
-        `
+      return basePrompt + `
 
-Context: This is a request where the user wants to explore and develop an idea they have and would like help improving it.
-
-End with suggestions on how this idea could be expanded or improved.`
-      );
+How could it be improved?`;
     }
   }
 }
@@ -93,7 +67,7 @@ export async function POST(req: Request) {
     // Call Claude with PDF as document
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
+      max_tokens: 300,
       messages: [
         {
           role: "user",

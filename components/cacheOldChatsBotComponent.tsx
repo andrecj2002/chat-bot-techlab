@@ -68,7 +68,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
     if (typeof window !== "undefined") {
       window.dispatchEvent(
         new CustomEvent("load-cached-chat", {
-          detail: { messages: chat.messages },
+          detail: { messages: chat.messages, chatId: chat.id },
         })
       );
     }
@@ -227,27 +227,44 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
 
 // Hook to use cache functionality
 export function useChatCache() {
-  const saveChat = (messages: CachedChat["messages"], title: string) => {
+  const saveChat = (messages: CachedChat["messages"], title: string, chatId?: string) => {
     try {
       const stored = localStorage.getItem("chatbot_cache") || "[]";
       const allChats: CachedChat[] = JSON.parse(stored);
 
-      const newChat: CachedChat = {
-        id: `chat_${Date.now()}`,
-        timestamp: Date.now(),
-        title,
-        messages,
-      };
+      // If chatId is provided, update existing chat; otherwise create new
+      const idToUse = chatId || `chat_${Date.now()}`;
+      const existingIndex = allChats.findIndex((chat) => chat.id === idToUse);
 
-      allChats.push(newChat);
+      if (existingIndex !== -1) {
+        // Update existing chat with new messages and timestamp
+        allChats[existingIndex] = {
+          ...allChats[existingIndex],
+          title,
+          messages,
+          timestamp: Date.now(),
+        };
+      } else {
+        // Create new chat
+        const newChat: CachedChat = {
+          id: idToUse,
+          timestamp: Date.now(),
+          title,
+          messages,
+        };
+        allChats.push(newChat);
+      }
 
       const now = Date.now();
       const fortyEightHoursAgo = now - 48 * 60 * 60 * 1000;
       const filtered = allChats.filter((chat) => chat.timestamp >= fortyEightHoursAgo);
 
       localStorage.setItem("chatbot_cache", JSON.stringify(filtered));
+      
+      return idToUse;
     } catch (error) {
       console.error("Error saving chat to cache:", error);
+      return chatId || `chat_${Date.now()}`;
     }
   };
 

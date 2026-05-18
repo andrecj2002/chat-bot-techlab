@@ -25,6 +25,7 @@ export default function ConfigBotComponent() {
   const [pdfUploadLoading, setPdfUploadLoading] = useState<boolean>(false);
   const [pdfFileName, setPdfFileName] = useState<string>("");
   const [pdfUploaded, setPdfUploaded] = useState<boolean>(false);
+  const [currentChatId, setCurrentChatId] = useState<string>(`chat_${Date.now()}`);
 
   const userOnlyMessages = messages.filter((m) => m.role === "user");
   const showLanguageOptions = messages.length === 1 && messages[0]?.role === "assistant";
@@ -95,8 +96,19 @@ export default function ConfigBotComponent() {
     if (!userChoice) return baseSteps;
     if (userChoice === "A") return steps;
     if (userChoice === "B") {
-      // Route B: Show all 6 steps upfront so user can see the full journey
-      return steps;
+      // Route B: Show steps 1-4 (Language, Company, Options, Brainstorming)
+      // Dynamically add step 5 and 6 as the conversation progresses
+      const routeB = [
+        ...baseSteps,
+        { label: isEnglishFlow ? "Brainstorming" : "Brainstorming" },
+      ];
+      // Add step 5 when bot asks for logistics/finance
+      if (currentStep >= 5) {
+        routeB.push(steps[4]); // "Logistics & Finance" / "Logística e Finanças"
+        // Also add step 6 as a preview so user knows it's coming next
+        routeB.push(steps[5]); // "Contact" / "Contacto"
+      }
+      return routeB;
     }
     return baseSteps;
   };
@@ -199,11 +211,16 @@ export default function ConfigBotComponent() {
   // Listen for cached chat load events
   useEffect(() => {
     const handleLoadCachedChat = (event: any) => {
-      const { messages } = event.detail;
+      const { messages, chatId } = event.detail;
       setMessages(messages);
       setInput("");
       setChatSaved(true); // Mark as saved initially
       setSavedMessageCount(messages.length); // Track the message count of the loaded chat
+      
+      // Set the chat ID so future saves update this chat, not create a new one
+      if (chatId) {
+        setCurrentChatId(chatId);
+      }
 
       // Calculate the correct step based on the loaded conversation
       const lastAssistantMessage = messages
@@ -450,7 +467,7 @@ export default function ConfigBotComponent() {
     setIsSaving(true);
     try {
       const title = await generateChatTitle(messages);
-      saveChat(messages, title);
+      saveChat(messages, title, currentChatId);
       setChatSaved(true);
       setSavedMessageCount(messages.length); // Track message count at save time
       
@@ -463,17 +480,7 @@ export default function ConfigBotComponent() {
     }
   };
 
-  // Listen for save chat event from header
-  useEffect(() => {
-    const handleSaveEvent = () => {
-      void handleSaveChat();
-    };
-
-    window.addEventListener("save-current-chat", handleSaveEvent);
-    return () => window.removeEventListener("save-current-chat", handleSaveEvent);
-  }, [messages]);
-
-  // Auto-save chat when step exceeds 3
+  // Auto-save chat when step exceeds 3 (after user chooses option A or B)
   useEffect(() => {
     const autoSaveChat = async () => {
       if (currentStep > 3 && messages.length > 0 && !chatSaved && !isSaving) {
