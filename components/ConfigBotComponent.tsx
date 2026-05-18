@@ -32,6 +32,8 @@ export default function ConfigBotComponent() {
   const [pendingAttachments, setPendingAttachments] = useState<FileAttachment[]>([]);
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [generatingPDF, setGeneratingPDF] = useState<boolean>(false);
+  const [askedForPDF, setAskedForPDF] = useState<boolean>(false);
 
   const userOnlyMessages = messages.filter((m) => m.role === "user");
   const showLanguageOptions = messages.length === 1 && messages[0]?.role === "assistant";
@@ -77,6 +79,9 @@ export default function ConfigBotComponent() {
   // DURANTE AS OPÇÕES E PEDIDO, ESCONDER INPUT PARA FORÇAR CLIQUE (EVITA RESPOSTAS LIVRES NESSA FASE)
   const showInput = !(currentStep === 1 || currentStep === 3);
   const showUploadButton = currentStep >= 4 && userChoice;
+  
+  // Show PDF confirmation buttons when bot has asked for PDF generation
+  const showPDFConfirmation = askedForPDF && !generatingPDF && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && (messages[messages.length - 1]?.content.includes("gerar") || messages[messages.length - 1]?.content.includes("generate"));
 
   const steps = isEnglishFlow
     ? [
@@ -324,29 +329,16 @@ export default function ConfigBotComponent() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [messages.length, chatSaved]);
 
-  // Add summary message when contact step is reached
+  // Auto-save chat when step exceeds 3 (after user chooses option A or B)
   useEffect(() => {
-    if (currentStep === 6 && messages.length > 0) {
-      // Check if summary message already exists
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage && lastMessage.role === "assistant" && lastMessage.content.includes("[SUMMARY_PDF]")) {
-        return; // Summary already added
+    const autoSaveChat = async () => {
+      if (currentStep > 3 && messages.length > 0 && !chatSaved && !isSaving) {
+        await handleSaveChat(true); // Pass true to indicate auto-save
       }
+    };
 
-      // Check if the last assistant message is a contact request (not a summary)
-      const lastAssistantMsg = messages.slice().reverse().find((m) => m.role === "assistant");
-      if (lastAssistantMsg && !lastAssistantMsg.content.includes("[SUMMARY_PDF]")) {
-        // Add summary message
-        const summaryMessage: Message = {
-          role: "assistant",
-          content: isPortugueseFlow 
-            ? "Aqui está o resumo da nossa conversa: [SUMMARY_PDF]" 
-            : "Here is the summary of our conversation: [SUMMARY_PDF]",
-        };
-        setMessages((prev) => [...prev, summaryMessage]);
-      }
-    }
-  }, [currentStep, messages.length, isPortugueseFlow]);
+    void autoSaveChat();
+  }, [currentStep, messages.length, chatSaved, isSaving]);
 
   const sendMessageWithContent = async (content: string, attachmentsToSend?: FileAttachment[]): Promise<void> => {
     if (!content.trim() && (!attachmentsToSend || attachmentsToSend.length === 0)) return;
@@ -365,6 +357,19 @@ export default function ConfigBotComponent() {
     // clear input if it came from the typed field
     if (content === input) {
       setInput("");
+    }
+
+    // Special handling for step 6 (contact): instead of calling API, ask about PDF generation
+    if (currentStep === 6 && !askedForPDF) {
+      const askingMessage: Message = {
+        role: "assistant",
+        content: isPortugueseFlow 
+          ? "Obrigado pelas informações de contacto! Tenho agora todos os detalhes da sua solicitação. Posso gerar um documento resumo com as informações da conversa. Devo proceder com a geração do documento?"
+          : "Thank you for providing your contact information! I now have all the details about your request. I can generate a summary document with the information from our conversation. Should I proceed with generating the document?",
+      };
+      setMessages((prev) => [...prev, askingMessage]);
+      setAskedForPDF(true);
+      return; // Don't call API
     }
 
     // immediate step transitions on user actions
@@ -520,6 +525,167 @@ export default function ConfigBotComponent() {
     void autoSaveChat();
   }, [currentStep, messages.length, chatSaved, isSaving]);
 
+  // Generate PDF when user confirms
+  const generatePDFDocument = async (extractedData: { empresa: string; servico: string; contexto: string; prazoSolicitado: string; requisitoEspecificos: string; equipa: string; financiamento: string; contacto: string }) => {
+    const jsPDF = (await import("jspdf")).jsPDF;
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    // Set fonts
+    pdf.setFont("Helvetica", "bold");
+    pdf.setFontSize(16);
+    pdf.text("pci · creative science park tech lab", 105, 20, { align: "center" });
+
+    pdf.setFont("Helvetica", "bold");
+    pdf.setFontSize(14);
+    pdf.text(isPortugueseFlow ? "Resumo Gerado pelo Chat-bot" : "Summary Generated by Chat-bot", 105, 30, { align: "center" });
+
+    pdf.setFont("Helvetica", "normal");
+    pdf.setFontSize(12);
+    pdf.text(
+      `${isPortugueseFlow ? "Pedido de" : "Request from"} ${extractedData.empresa}`,
+      105,
+      38,
+      { align: "center" }
+    );
+
+    // Table data
+    const rows = [
+      {
+        categoria: isPortugueseFlow ? "Servico" : "Service",
+        descricao: extractedData.servico || (isPortugueseFlow ? "Nao especificado" : "Not specified"),
+      },
+      {
+        categoria: isPortugueseFlow ? "Contexto" : "Context",
+        descricao: extractedData.contexto || (isPortugueseFlow ? "Nao especificado" : "Not specified"),
+      },
+      {
+        categoria: isPortugueseFlow ? "Prazo Solicitado" : "Requested Timeline",
+        descricao: extractedData.prazoSolicitado || (isPortugueseFlow ? "Nao especificado" : "Not specified"),
+      },
+      {
+        categoria: isPortugueseFlow ? "Requisitos Especificos" : "Specific Requirements",
+        descricao: extractedData.requisitoEspecificos || (isPortugueseFlow ? "Nao especificado" : "Not specified"),
+      },
+      {
+        categoria: isPortugueseFlow ? "Equipa" : "Team",
+        descricao: extractedData.equipa || (isPortugueseFlow ? "Nao especificado" : "Not specified"),
+      },
+      {
+        categoria: isPortugueseFlow ? "Financiamento" : "Financing",
+        descricao: extractedData.financiamento || (isPortugueseFlow ? "Nao especificado" : "Not specified"),
+      },
+      {
+        categoria: isPortugueseFlow ? "Contacto" : "Contact",
+        descricao: extractedData.contacto || (isPortugueseFlow ? "Nao especificado" : "Not specified"),
+      },
+    ];
+
+    // Table styling
+    let currentY = 50;
+
+    // Header
+    pdf.setFont("Helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.text(isPortugueseFlow ? "Categoria" : "Category", 15, currentY + 8);
+    pdf.text(isPortugueseFlow ? "Descricao" : "Description", 70, currentY + 8);
+    pdf.line(15, currentY + 12, 200, currentY + 12);
+    currentY += 20;
+
+    // Rows
+    pdf.setFont("Helvetica", "normal");
+    pdf.setFontSize(9);
+    rows.forEach((row) => {
+      // Check if we need a new page
+      if (currentY > 270) {
+        pdf.addPage();
+        currentY = 20;
+      }
+
+      // Category
+      pdf.text(row.categoria, 15, currentY);
+
+      // Description (with text wrapping)
+      const descriptionLines = pdf.splitTextToSize(row.descricao, 130);
+      pdf.text(descriptionLines, 70, currentY);
+
+      // Calculate row height based on content
+      const cellHeight = Math.max(10, descriptionLines.length * 6);
+      currentY += cellHeight + 5;
+
+      // Row separator
+      pdf.line(15, currentY - 5, 200, currentY - 5);
+    });
+
+    // Download PDF
+    pdf.save(`resumo_${extractedData.empresa}.pdf`);
+  };
+
+  const handleGeneratePDF = async () => {
+    setGeneratingPDF(true);
+    
+    try {
+      // Try to extract data via API first
+      const extractResponse = await fetch("/api/extract-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages, isPortugueseFlow }),
+      });
+
+      let extractedData;
+
+      if (extractResponse.ok) {
+        // API extraction successful
+        const responseData = await extractResponse.json();
+        extractedData = responseData.data;
+      } else {
+        // API failed, use simple local extraction
+        console.warn("API extraction failed, using local extraction");
+        extractedData = {
+          empresa: messages.find((m, i) => m.role === "user" && i > 0 && m.content !== "A" && m.content !== "B")?.content || "Nao especificado",
+          servico: messages.find((m) => m.content === "A")
+            ? "Consultoria/Assessoria"
+            : messages.find((m) => m.content === "B")
+            ? "Brainstorming/Ideacao"
+            : "Nao especificado",
+          contexto: messages.find((m) => m.role === "user" && m.content.length > 50)?.content.slice(0, 200) || "Nao especificado",
+          prazoSolicitado: "Nao especificado",
+          requisitoEspecificos: "Nao especificado",
+          equipa: "Nao especificado",
+          financiamento: "Nao especificado",
+          contacto: messages[messages.length - 2]?.role === "user" ? messages[messages.length - 2]?.content : "Nao especificado",
+        };
+      }
+
+      // Generate and download PDF
+      await generatePDFDocument(extractedData);
+
+      // Add confirmation message
+      const pdfMessage: Message = {
+        role: "assistant",
+        content: isPortugueseFlow 
+          ? "✓ Documento gerado e descarregado com sucesso!" 
+          : "✓ Document generated and downloaded successfully!",
+      };
+      setMessages((prev) => [...prev, pdfMessage]);
+      setGeneratingPDF(false);
+      setAskedForPDF(false);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      const errorMessage: Message = {
+        role: "assistant",
+        content: isPortugueseFlow 
+          ? "Desculpe, houve um erro ao gerar o documento. Tente novamente." 
+          : "Sorry, there was an error generating the document. Please try again.",
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+      setGeneratingPDF(false);
+    }
+  };
+
   // Reset chat function
   const handleResetChat = async () => {
     setMenuOpen(false);
@@ -539,6 +705,7 @@ export default function ConfigBotComponent() {
     setChatSaved(false);
     setSavedMessageCount(0);
     setCurrentChatId(`chat_${Date.now()}`);
+    setAskedForPDF(false);
 
     // Start new conversation
     void startConversation();
@@ -616,6 +783,19 @@ export default function ConfigBotComponent() {
             <div className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" />
           </div>
         )}
+        {generatingPDF && (
+          <div className="mb-4 sm:mb-5 flex flex-col gap-2">
+            <div className="text-sm text-slate-600 font-medium">
+              {isPortugueseFlow ? "A gerar documento..." : "Generating document..."}
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+              <div 
+                className="bg-indigo-600 h-full rounded-full animate-pulse"
+                style={{width: '60%'}}
+              ></div>
+            </div>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -650,6 +830,23 @@ export default function ConfigBotComponent() {
               className="rounded-full border border-slate-300 bg-white px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
             >
               {isPortugueseFlow ? "B) Explorar uma ideia que tem" : "B) Explore an idea you have"}
+            </button>
+          </div>
+        )}
+
+        {showPDFConfirmation && (
+          <div className="flex flex-wrap gap-2 sm:gap-3 px-1">
+            <button
+              onClick={handleGeneratePDF}
+              className="rounded-full border border-slate-300 bg-white px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+            >
+              {isPortugueseFlow ? "Sim, gerar documento" : "Yes, generate document"}
+            </button>
+            <button
+              onClick={() => setAskedForPDF(false)}
+              className="rounded-full border border-slate-300 bg-white px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+            >
+              {isPortugueseFlow ? "Não, continuar conversando" : "No, keep talking"}
             </button>
           </div>
         )}
