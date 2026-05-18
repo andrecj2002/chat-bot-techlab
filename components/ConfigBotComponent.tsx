@@ -862,6 +862,7 @@ export default function ConfigBotComponent() {
             onFileInputRef={setDocumentFileInputRef}
             onUploadLoadingChange={setFileUploadLoading}
             fileUploaded={fileUploaded}
+            userMessageCount={messages.filter((m) => m.role === "user").length}
           />
         </div>
       </div>

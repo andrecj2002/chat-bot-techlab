@@ -18,6 +18,7 @@ type EnviarResumoBotComponentProps = {
   onFileInputRef?: (ref: React.MutableRefObject<HTMLInputElement | null>) => void;
   onUploadLoadingChange?: (isLoading: boolean) => void;
   fileUploaded?: boolean;
+  userMessageCount?: number;
 };
 
 export default function EnviarResumoBotComponent({
@@ -30,6 +31,7 @@ export default function EnviarResumoBotComponent({
   onFileInputRef,
   onUploadLoadingChange,
   fileUploaded = false,
+  userMessageCount = 0,
 }: EnviarResumoBotComponentProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadLoading, setUploadLoading] = useState<boolean>(false);
@@ -109,7 +111,7 @@ export default function EnviarResumoBotComponent({
         aria-label={isPortugueseFlow ? "Enviar ficheiro" : "Upload file"}
       />
 
-      {!fileUploaded && (
+      {!fileUploaded && userMessageCount <= 2 && (
         <div className="text-xs text-slate-500 italic">
           {isPortugueseFlow
             ? "💡 Dica: Clique no ícone de clipe para anexar um PDF ou imagem com a sua proposta ou ideia"
