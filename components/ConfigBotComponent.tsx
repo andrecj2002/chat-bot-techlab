@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useChatCache } from "./cacheOldChatsBotComponent";
+import GerarResumoBotComponent from "./GerarResumoBotComponent";
 import EnviarResumoBotComponent from "./EnviarResumoBotComponent";
 import AttachmentDisplay from "./AttachmentDisplay";
 import { FileAttachment } from "@/utils/attachments";
@@ -323,6 +324,30 @@ export default function ConfigBotComponent() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [messages.length, chatSaved]);
 
+  // Add summary message when contact step is reached
+  useEffect(() => {
+    if (currentStep === 6 && messages.length > 0) {
+      // Check if summary message already exists
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.role === "assistant" && lastMessage.content.includes("[SUMMARY_PDF]")) {
+        return; // Summary already added
+      }
+
+      // Check if the last assistant message is a contact request (not a summary)
+      const lastAssistantMsg = messages.slice().reverse().find((m) => m.role === "assistant");
+      if (lastAssistantMsg && !lastAssistantMsg.content.includes("[SUMMARY_PDF]")) {
+        // Add summary message
+        const summaryMessage: Message = {
+          role: "assistant",
+          content: isPortugueseFlow 
+            ? "Aqui está o resumo da nossa conversa: [SUMMARY_PDF]" 
+            : "Here is the summary of our conversation: [SUMMARY_PDF]",
+        };
+        setMessages((prev) => [...prev, summaryMessage]);
+      }
+    }
+  }, [currentStep, messages.length, isPortugueseFlow]);
+
   const sendMessageWithContent = async (content: string, attachmentsToSend?: FileAttachment[]): Promise<void> => {
     if (!content.trim() && (!attachmentsToSend || attachmentsToSend.length === 0)) return;
 
@@ -571,7 +596,14 @@ export default function ConfigBotComponent() {
               </div>
             ) : (
               <div className="max-w-[85%] sm:max-w-[78%] rounded-3xl rounded-tl-md border border-slate-200 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base leading-6 sm:leading-7 text-slate-900 shadow-sm">
-                {renderAssistantContent(m.content)}
+                {m.content.includes("[SUMMARY_PDF]") ? (
+                  <div className="flex flex-col gap-2">
+                    <p>{m.content.replace("[SUMMARY_PDF]", "").trim()}</p>
+                    <GerarResumoBotComponent messages={messages} isPortugueseFlow={isPortugueseFlow} />
+                  </div>
+                ) : (
+                  renderAssistantContent(m.content)
+                )}
               </div>
             )}
           </div>
