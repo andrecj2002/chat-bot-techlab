@@ -213,9 +213,24 @@ This is not optional. The frontend UI depends on these markers to advance the pr
 If you forget the marker, the UI will not progress and the user experience breaks.
 ====`;
 
+type FileAttachment = {
+  id: string;
+  type: "pdf" | "image";
+  fileName: string;
+  base64Data: string;
+  mimeType: string;
+  size: number;
+};
+
 type Message = {
   role: "user" | "assistant";
   content: string;
+  attachments?: FileAttachment[];
+};
+
+type AnthropicMessageParam = {
+  role: "user" | "assistant";
+  content: string | Anthropic.ContentBlockParam[];
 };
 
 export async function POST(req: Request) {
@@ -232,11 +247,83 @@ export async function POST(req: Request) {
 
     const systemPrompt = `${SYSTEM_PROMPT_TEMPLATE}\n\n${RESPONSE_STYLE}\n${RESPONSE_STYLE_EXTRA}\n${MARKER_REMINDER}\n\n--- DOCUMENT ---\n${docText}`;
 
+    // Convert messages to Anthropic format, handling attachments
+    const anthropicMessages: AnthropicMessageParam[] = messages.map((msg) => {
+      if (msg.role === "assistant") {
+        return {
+          role: "assistant",
+          content: msg.content,
+        };
+      }
+
+      // For user messages with attachments
+      if (msg.attachments && msg.attachments.length > 0) {
+        const content: Anthropic.ContentBlockParam[] = [];
+
+        // Add text content if present
+        if (msg.content && msg.content !== "See attachments") {
+          content.push({
+            type: "text",
+            text: msg.content,
+          });
+        }
+
+        // Add attachments
+        for (const attachment of msg.attachments) {
+          if (attachment.type === "image") {
+            // Add image
+            const imageMediaType =
+              attachment.mimeType === "image/jpeg"
+                ? "image/jpeg"
+                : attachment.mimeType === "image/png"
+                  ? "image/png"
+                  : attachment.mimeType === "image/gif"
+                    ? "image/gif"
+                    : "image/webp";
+
+            content.push({
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: imageMediaType as
+                  | "image/jpeg"
+                  | "image/png"
+                  | "image/gif"
+                  | "image/webp",
+                data: attachment.base64Data,
+              },
+            });
+          } else if (attachment.type === "pdf") {
+            // Add PDF as document
+            content.push({
+              type: "document",
+              source: {
+                type: "base64",
+                media_type: "application/pdf",
+                data: attachment.base64Data,
+              },
+            });
+          }
+        }
+
+        return {
+          role: "user",
+          content,
+        };
+      }
+
+      // Regular text-only message
+      return {
+        role: "user",
+        content: msg.content,
+      };
+    });
+
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1024,
       system: systemPrompt,
-      messages,
+      messages: anthropicMessages,
     });
 
     const reply = response.content[0];

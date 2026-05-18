@@ -2,10 +2,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useChatCache } from "./cacheOldChatsBotComponent";
 import EnviarResumoBotComponent from "./EnviarResumoBotComponent";
+import AttachmentDisplay from "./AttachmentDisplay";
+import { FileAttachment } from "@/utils/attachments";
 
 type Message = {
   role: "user" | "assistant";
   content: string;
+  attachments?: FileAttachment[];
 };
 
 export default function ConfigBotComponent() {
@@ -22,10 +25,12 @@ export default function ConfigBotComponent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [documentFileInputRef, setDocumentFileInputRef] = useState<React.MutableRefObject<HTMLInputElement | null> | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [pdfUploadLoading, setPdfUploadLoading] = useState<boolean>(false);
-  const [pdfFileName, setPdfFileName] = useState<string>("");
-  const [pdfUploaded, setPdfUploaded] = useState<boolean>(false);
+  const [fileUploadLoading, setFileUploadLoading] = useState<boolean>(false);
+  const [fileUploaded, setFileUploaded] = useState<boolean>(false);
   const [currentChatId, setCurrentChatId] = useState<string>(`chat_${Date.now()}`);
+  const [pendingAttachments, setPendingAttachments] = useState<FileAttachment[]>([]);
+  const [menuOpen, setMenuOpen] = useState<boolean>(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const userOnlyMessages = messages.filter((m) => m.role === "user");
   const showLanguageOptions = messages.length === 1 && messages[0]?.role === "assistant";
@@ -222,20 +227,57 @@ export default function ConfigBotComponent() {
         setCurrentChatId(chatId);
       }
 
+      // First, detect user choice from messages
+      const userMessages = messages.filter((m: Message) => m.role === "user");
+      let detectedChoice: "A" | "B" | null = null;
+      
+      for (const msg of userMessages) {
+        const content = msg.content.trim().toUpperCase();
+        if (content === "A" || content === "B") {
+          detectedChoice = content as "A" | "B";
+          setUserChoice(content);
+          break;
+        }
+      }
+
       // Calculate the correct step based on the loaded conversation
       const lastAssistantMessage = messages
         .slice()
         .reverse()
         .find((m: Message) => m.role === "assistant");
       
-      const userCount = messages.filter((m: Message) => m.role === "user").length;
+      const userCount = userMessages.length;
       
-      if (lastAssistantMessage) {
-        const calculatedStep = getStepFromAssistantReply(lastAssistantMessage.content, userCount);
-        setCurrentStep(calculatedStep);
+      // If user has selected A or B, we're at least at step 4
+      // Use fallback user count logic to determine exact step
+      let calculatedStep = 1;
+      if (detectedChoice) {
+        // User has made a choice, so at least step 4
+        if (lastAssistantMessage) {
+          const detectsContact = /contacto|contato|contact|contact details|follow-up|email|telefone|telemóvel|phone/i.test(lastAssistantMessage.content);
+          const detectsLogistics = /deadline|prazo|prazos|financ|orçamento|budget|equipa interna|internal team|timing|timeframe|schedule/i.test(lastAssistantMessage.content);
+          
+          if (detectsContact) {
+            calculatedStep = 6;
+          } else if (detectsLogistics) {
+            calculatedStep = 5;
+          } else {
+            // In brainstorming or awaiting request details
+            calculatedStep = 4;
+          }
+        } else {
+          calculatedStep = 4;
+        }
       } else {
-        setCurrentStep(4); // Default to step 4 if no assistant message
+        // User hasn't selected A or B yet, use pattern detection
+        if (lastAssistantMessage) {
+          calculatedStep = getStepFromAssistantReply(lastAssistantMessage.content, userCount);
+        } else {
+          calculatedStep = 1;
+        }
       }
+
+      setCurrentStep(calculatedStep);
     };
 
     window.addEventListener("load-cached-chat", handleLoadCachedChat);
@@ -281,12 +323,20 @@ export default function ConfigBotComponent() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [messages.length, chatSaved]);
 
-  const sendMessageWithContent = async (content: string): Promise<void> => {
-    if (!content.trim()) return;
+  const sendMessageWithContent = async (content: string, attachmentsToSend?: FileAttachment[]): Promise<void> => {
+    if (!content.trim() && (!attachmentsToSend || attachmentsToSend.length === 0)) return;
 
-    const userMsg: Message = { role: "user", content };
+    const attachments = attachmentsToSend || pendingAttachments;
+    const userMsg: Message = { 
+      role: "user", 
+      content: content.trim() || (attachments.length > 0 ? "See attachments" : ""),
+      attachments: attachments.length > 0 ? attachments : undefined,
+    };
     const updated = [...messages, userMsg];
     setMessages(updated);
+    setPendingAttachments([]);
+    setFileUploaded(false);
+    
     // clear input if it came from the typed field
     if (content === input) {
       setInput("");
@@ -353,60 +403,14 @@ export default function ConfigBotComponent() {
   };
 
   const sendMessage = async (): Promise<void> => {
-    await sendMessageWithContent(input);
+    await sendMessageWithContent(input, pendingAttachments.length > 0 ? pendingAttachments : undefined);
   };
 
-  const handleDocumentAnalyzed = async (analysis: string, fileName: string): Promise<void> => {
-    // Add the document analysis as a user message
-    const userMsg: Message = { 
-      role: "user", 
-      content: `[PDF: ${fileName}]\n\n${analysis}` 
-    };
-    const updated = [...messages, userMsg];
-    setMessages(updated);
-    setPdfUploadLoading(false);
-    setPdfFileName("");
-    setPdfUploaded(true);
-
-    setLoading(true);
-    try {
-      // Send to bot for response, with context that a document was just analyzed
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: updated }),
-      });
-      if (!res.ok) throw new Error(`API error ${res.status}`);
-      const data = await res.json();
-      const assistantReply = data.reply ?? "";
-      const marker: string | null = data.marker ?? null;
-      setMessages([...updated, { role: "assistant", content: assistantReply }]);
-
-      // Prefer deterministic marker if provided by server/model
-      if (marker === "[COMPANY_DETAILS_REQUEST]") {
-        setStepIfHigher(2);
-      } else if (marker === "[OPTIONS_REQUEST]") {
-        setStepIfHigher(3);
-      } else if (marker === "[AWAITING_REQUEST]") {
-        setStepIfHigher(4);
-      } else if (marker === "[LOGISTICS_FINANCE_REQUEST]") {
-        setStepIfHigher(5);
-      } else if (marker === "[CONTACT_REQUEST]") {
-        setStepIfHigher(6);
-      } else {
-        // Fallback heuristics
-        const userCount = updated.filter((m) => m.role === "user").length;
-        setStepIfHigher(getStepFromAssistantReply(assistantReply, userCount));
-      }
-    } catch (err) {
-      console.error("Document analysis response error:", err);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Sorry, something went wrong processing your document." },
-      ]);
-    } finally {
-      setLoading(false);
-    }
+  const handleDocumentsAttached = async (attachments: FileAttachment[]): Promise<void> => {
+    // Add attachments to pending attachments (don't send message yet)
+    setPendingAttachments(attachments);
+    setFileUploaded(true);
+    setFileUploadLoading(false);
   };
 
   useEffect(() => {
@@ -491,31 +495,78 @@ export default function ConfigBotComponent() {
     void autoSaveChat();
   }, [currentStep, messages.length, chatSaved, isSaving]);
 
-  // Helper to check if message is a PDF upload and extract filename
-  const getPdfFileName = (content: string): string | null => {
-    const match = content.match(/^\[PDF: (.+?)\]/);
-    return match ? match[1] : null;
+  // Reset chat function
+  const handleResetChat = async () => {
+    setMenuOpen(false);
+    
+    // Save current chat if it has content
+    if (messages.length > 1) {
+      await handleSaveChat(false);
+    }
+
+    // Reset state
+    setMessages([]);
+    setCurrentStep(1);
+    setInput("");
+    setUserChoice(null);
+    setPendingAttachments([]);
+    setFileUploaded(false);
+    setChatSaved(false);
+    setSavedMessageCount(0);
+    setCurrentChatId(`chat_${Date.now()}`);
+
+    // Start new conversation
+    void startConversation();
   };
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col font-sans">
       <div className="chat-scroll flex-1 min-h-0 overflow-y-auto pr-1">
         {messages.map((m, i) => {
-          const pdfFileName = m.role === "user" ? getPdfFileName(m.content) : null;
-          
           return (
           <div key={i} className={`mb-4 sm:mb-5 flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             {m.role === "user" ? (
-              <div className="max-w-[85%] sm:max-w-[78%] rounded-3xl rounded-tr-md bg-slate-900 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base leading-6 sm:leading-7 text-white shadow-sm">
-                {pdfFileName ? (
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 3.414l4 4v10.586A2 2 0 0114 20H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H7a1 1 0 01-1-1v-6z" clipRule="evenodd" />
-                    </svg>
-                    <span className="truncate">{pdfFileName}</span>
+              <div className="max-w-[85%] sm:max-w-[78%] flex flex-col gap-2">
+                {m.attachments && m.attachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    {m.attachments.map((att) => (
+                      <div key={att.id} className="bg-white rounded-lg border border-slate-200 overflow-hidden max-w-[200px]">
+                        {att.type === "image" ? (
+                          <img
+                            src={`data:${att.mimeType};base64,${att.base64Data}`}
+                            alt={att.fileName}
+                            className="max-w-full max-h-[200px] object-cover rounded-lg"
+                          />
+                        ) : (
+                          <div className="flex items-center gap-2 px-3 py-2 text-sm">
+                            <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 3.414l4 4v10.586A2 2 0 0114 20H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H7a1 1 0 01-1-1v-6z" clipRule="evenodd" />
+                            </svg>
+                            <span className="truncate text-slate-900 font-medium">{att.fileName}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ) : (
-                  m.content
+                )}
+                {m.content && m.content !== "See attachments" && (
+                  <div className="rounded-3xl rounded-tr-md bg-slate-900 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base leading-6 sm:leading-7 text-white shadow-sm">
+                    {m.content}
+                  </div>
                 )}
               </div>
             ) : (
@@ -577,19 +628,19 @@ export default function ConfigBotComponent() {
             userChoice={userChoice}
             isEnglishFlow={isEnglishFlow}
             isPortugueseFlow={isPortugueseFlow}
-            onDocumentAnalyzed={handleDocumentAnalyzed}
+            onDocumentsAnalyzed={handleDocumentsAttached}
             isLoading={loading}
             onFileInputRef={setDocumentFileInputRef}
-            onUploadLoadingChange={setPdfUploadLoading}
-            pdfUploaded={pdfUploaded}
+            onUploadLoadingChange={setFileUploadLoading}
+            fileUploaded={fileUploaded}
           />
         </div>
       </div>
 
-      {pdfUploadLoading && (
+      {fileUploadLoading && (
         <div className="flex flex-col gap-3 px-1 py-4 sm:py-6 border-t border-slate-100 mb-3">
           <div className="text-sm sm:text-base text-slate-600 font-medium">
-            {isPortugueseFlow ? "Processando PDF..." : "Processing PDF..."}
+            {isPortugueseFlow ? "Processando ficheiro..." : "Processing file..."}
           </div>
           <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
             <div 
@@ -601,31 +652,72 @@ export default function ConfigBotComponent() {
       )}
 
       {showInput && (
-        <div className="flex items-center gap-2 sm:gap-3 border-b border-slate-300 px-1 pb-2 sm:pb-2 mt-4">
-          {showUploadButton && (
-            <button
-              onClick={() => documentFileInputRef?.current?.click()}
-              title={isPortugueseFlow ? "Enviar PDF" : "Upload PDF"}
-              className="text-slate-400 transition hover:text-slate-600 shrink-0 flex items-center justify-center"
-            >
-              <img src="/clip-svgrepo-com.svg" alt="Clip" className="w-5 h-5" style={{filter: 'brightness(0.5)'}} />
-            </button>
-          )}
-          <input
-            value={input}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
-            onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && sendMessage()}
-            placeholder="Write a reply..."
-            className="flex-1 bg-transparent px-0 py-1 sm:py-1.5 text-xs sm:text-base text-slate-900 outline-none placeholder:text-slate-400"
+        <div className="flex flex-col gap-0 border-t border-slate-300 mt-4">
+          <AttachmentDisplay
+            attachments={pendingAttachments}
+            onRemove={(id) => setPendingAttachments(pendingAttachments.filter((a) => a.id !== id))}
+            isDisabled={loading || fileUploadLoading}
           />
-          <button
-            onClick={sendMessage}
-            className="text-slate-900 transition hover:text-slate-600 shrink-0"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2 sm:gap-3 px-1 py-2 sm:py-2">
+            {showUploadButton && (
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  title={isPortugueseFlow ? "Opções" : "Options"}
+                  className="text-slate-400 transition hover:text-slate-600 shrink-0 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed w-6 h-6 rounded hover:bg-slate-100"
+                  disabled={loading || fileUploadLoading}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+
+                {/* Menu dropdown */}
+                {menuOpen && (
+                  <div className="absolute bottom-full mb-2 left-0 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-max">
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        documentFileInputRef?.current?.click();
+                      }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-900 hover:bg-slate-100 rounded-t-lg transition"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      {isPortugueseFlow ? "Enviar ficheiro ou imagem" : "Send file or image"}
+                    </button>
+                    <button
+                      onClick={handleResetChat}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-b-lg transition border-t border-slate-100"
+                      disabled={loading}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      {isPortugueseFlow ? "Resetar conversa" : "Reset chat"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            <input
+              value={input}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
+              onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && sendMessage()}
+              placeholder={pendingAttachments.length > 0 ? "Add a message (optional)..." : "Write a reply..."}
+              className="flex-1 bg-transparent px-0 py-1 sm:py-1.5 text-xs sm:text-base text-slate-900 outline-none placeholder:text-slate-400"
+            />
+            <button
+              onClick={sendMessage}
+              disabled={!input.trim() && pendingAttachments.length === 0}
+              className="text-slate-900 transition hover:text-slate-600 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 
