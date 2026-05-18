@@ -17,6 +17,18 @@ export type CachedChat = {
       size: number;
     }[];
   }[];
+  isPermanent?: boolean;
+  hasPDF?: boolean;
+  extractedData?: {
+    empresa: string;
+    servico: string;
+    contexto: string;
+    prazoSolicitado: string;
+    requisitoEspecificos: string;
+    equipa: string;
+    financiamento: string;
+    contacto: string;
+  };
 };
 
 interface CacheOldChatsBotComponentProps {
@@ -28,6 +40,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
   const [cachedChats, setCachedChats] = useState<CachedChat[]>([]);
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState<"pt" | "en">("pt");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Load cached chats from localStorage
   const loadCachedChats = () => {
@@ -39,13 +52,13 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
         const now = Date.now();
         const fortyEightHoursAgo = now - 48 * 60 * 60 * 1000;
 
-        // Filter chats from last 48 hours
-        const recentChats = allChats.filter((chat) => chat.timestamp >= fortyEightHoursAgo);
+        // Filter: keep chats from last 48 hours OR permanently saved chats
+        const filteredChats = allChats.filter((chat) => chat.timestamp >= fortyEightHoursAgo || chat.isPermanent);
 
         // Sort by timestamp descending (newest first)
-        recentChats.sort((a, b) => b.timestamp - a.timestamp);
+        filteredChats.sort((a, b) => b.timestamp - a.timestamp);
 
-        setCachedChats(recentChats);
+        setCachedChats(filteredChats);
       }
     } catch (error) {
       console.error("Error loading cached chats:", error);
@@ -76,7 +89,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
     if (typeof window !== "undefined") {
       window.dispatchEvent(
         new CustomEvent("load-cached-chat", {
-          detail: { messages: chat.messages, chatId: chat.id },
+          detail: { messages: chat.messages, chatId: chat.id, extractedData: chat.extractedData },
         })
       );
     }
@@ -85,16 +98,173 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
 
   const clearHistory = () => {
     const confirmMessage = language === "pt" 
-      ? "Tem certeza que deseja deletar todas as conversas? Esta ação não pode ser desfeita."
-      : "Are you sure you want to delete all chats? This cannot be undone.";
+      ? "Tem certeza que deseja deletar todas as conversas (exceto as guardadas permanentemente)? Esta ação não pode ser desfeita."
+      : "Are you sure you want to delete all chats except permanently saved ones? This cannot be undone.";
     
     if (confirm(confirmMessage)) {
       try {
-        localStorage.removeItem("chatbot_cache");
-        setCachedChats([]);
+        const stored = localStorage.getItem("chatbot_cache") || "[]";
+        let allChats: CachedChat[] = JSON.parse(stored);
+        // Keep only permanently saved chats
+        allChats = allChats.filter((chat) => chat.isPermanent);
+        localStorage.setItem("chatbot_cache", JSON.stringify(allChats));
+        setCachedChats(allChats);
       } catch (error) {
         console.error("Error clearing cache:", error);
       }
+    }
+  };
+
+  const togglePermanent = (chatId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      const stored = localStorage.getItem("chatbot_cache") || "[]";
+      const allChats: CachedChat[] = JSON.parse(stored);
+      const chatIndex = allChats.findIndex((c) => c.id === chatId);
+      
+      if (chatIndex !== -1) {
+        allChats[chatIndex].isPermanent = !allChats[chatIndex].isPermanent;
+        localStorage.setItem("chatbot_cache", JSON.stringify(allChats));
+        setCachedChats(allChats);
+      }
+    } catch (error) {
+      console.error("Error toggling permanent status:", error);
+    }
+  };
+
+  const deleteChat = (chatId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    const confirmMessage = language === "pt" 
+      ? "Tem certeza que deseja deletar esta conversa?"
+      : "Are you sure you want to delete this chat?";
+    
+    if (confirm(confirmMessage)) {
+      try {
+        const stored = localStorage.getItem("chatbot_cache") || "[]";
+        let allChats: CachedChat[] = JSON.parse(stored);
+        allChats = allChats.filter((c) => c.id !== chatId);
+        localStorage.setItem("chatbot_cache", JSON.stringify(allChats));
+        setCachedChats(allChats);
+        setOpenMenuId(null);
+      } catch (error) {
+        console.error("Error deleting chat:", error);
+      }
+    }
+  };
+
+  const downloadPDF = async (chat: CachedChat, event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      // Use cached extracted data if available, otherwise should not happen
+      let extractedData = chat.extractedData;
+
+      if (!extractedData) {
+        // Fallback if no cached data (shouldn't happen)
+        extractedData = {
+          empresa: chat.title || "Document",
+          servico: "Nao especificado",
+          contexto: "Nao especificado",
+          prazoSolicitado: "Nao especificado",
+          requisitoEspecificos: "Nao especificado",
+          equipa: "Nao especificado",
+          financiamento: "Nao especificado",
+          contacto: "Nao especificado",
+        };
+      }
+
+      // Generate PDF
+      const jsPDF = (await import("jspdf")).jsPDF;
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      // Set fonts
+      pdf.setFont("Helvetica", "bold");
+      pdf.setFontSize(16);
+      pdf.text("pci · creative science park tech lab", 105, 20, { align: "center" });
+
+      pdf.setFont("Helvetica", "bold");
+      pdf.setFontSize(14);
+      pdf.text(language === "pt" ? "Resumo Gerado pelo Chat-bot" : "Summary Generated by Chat-bot", 105, 30, { align: "center" });
+
+      pdf.setFont("Helvetica", "normal");
+      pdf.setFontSize(12);
+      pdf.text(
+        `${language === "pt" ? "Pedido de" : "Request from"} ${extractedData.empresa}`,
+        105,
+        38,
+        { align: "center" }
+      );
+
+      // Table data
+      const rows = [
+        {
+          categoria: language === "pt" ? "Servico" : "Service",
+          descricao: extractedData.servico || (language === "pt" ? "Nao especificado" : "Not specified"),
+        },
+        {
+          categoria: language === "pt" ? "Contexto" : "Context",
+          descricao: extractedData.contexto || (language === "pt" ? "Nao especificado" : "Not specified"),
+        },
+        {
+          categoria: language === "pt" ? "Prazo Solicitado" : "Requested Timeline",
+          descricao: extractedData.prazoSolicitado || (language === "pt" ? "Nao especificado" : "Not specified"),
+        },
+        {
+          categoria: language === "pt" ? "Requisitos Especificos" : "Specific Requirements",
+          descricao: extractedData.requisitoEspecificos || (language === "pt" ? "Nao especificado" : "Not specified"),
+        },
+        {
+          categoria: language === "pt" ? "Equipa" : "Team",
+          descricao: extractedData.equipa || (language === "pt" ? "Nao especificado" : "Not specified"),
+        },
+        {
+          categoria: language === "pt" ? "Financiamento" : "Financing",
+          descricao: extractedData.financiamento || (language === "pt" ? "Nao especificado" : "Not specified"),
+        },
+        {
+          categoria: language === "pt" ? "Contacto" : "Contact",
+          descricao: extractedData.contacto || (language === "pt" ? "Nao especificado" : "Not specified"),
+        },
+      ];
+
+      // Table styling
+      let currentY = 50;
+
+      // Header
+      pdf.setFont("Helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.text(language === "pt" ? "Categoria" : "Category", 15, currentY + 8);
+      pdf.text(language === "pt" ? "Descricao" : "Description", 70, currentY + 8);
+      pdf.line(15, currentY + 12, 200, currentY + 12);
+      currentY += 20;
+
+      // Rows
+      pdf.setFont("Helvetica", "normal");
+      pdf.setFontSize(9);
+      rows.forEach((row) => {
+        if (currentY > 270) {
+          pdf.addPage();
+          currentY = 20;
+        }
+
+        pdf.text(row.categoria, 15, currentY);
+        const descriptionLines = pdf.splitTextToSize(row.descricao, 130);
+        pdf.text(descriptionLines, 70, currentY);
+
+        const cellHeight = Math.max(10, descriptionLines.length * 6);
+        currentY += cellHeight + 5;
+
+        pdf.line(15, currentY - 5, 200, currentY - 5);
+      });
+
+      pdf.save(`resumo_${extractedData.empresa}.pdf`);
+      setOpenMenuId(null);
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      alert(language === "pt" ? "Erro ao gerar PDF" : "Error generating PDF");
     }
   };
 
@@ -194,19 +364,68 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
               ) : (
                 <div className="space-y-1.5 sm:space-y-3">
                   {cachedChats.map((chat) => (
-                    <button
-                      key={chat.id}
-                      onClick={() => handleLoadChat(chat)}
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2 sm:p-3 text-left transition hover:bg-slate-100 hover:border-slate-300"
-                    >
-                      <div className="text-xs sm:text-sm font-medium text-slate-900 truncate">
-                        {chat.title}
+                    <div key={chat.id} className="relative">
+                      <div
+                        onClick={() => handleLoadChat(chat)}
+                        className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2 sm:p-3 text-left transition hover:bg-slate-100 hover:border-slate-300 cursor-pointer flex items-start justify-between gap-2"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs sm:text-sm font-medium text-slate-900 truncate flex items-center gap-1.5">
+                            {chat.title}
+                            {chat.isPermanent && <span title={language === "pt" ? "Guardado permanentemente" : "Permanently saved"}>📌</span>}
+                            {chat.hasPDF && <span title={language === "pt" ? "PDF gerado" : "PDF generated"}>📄</span>}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-0.5 sm:mt-1 flex justify-between">
+                            <span>{getMessageCount(chat.messages)} {language === "pt" ? "mensagens" : "messages"}</span>
+                            <span>{formatDate(chat.timestamp)}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(openMenuId === chat.id ? null : chat.id);
+                          }}
+                          className="flex-shrink-0 p-2 rounded-lg hover:bg-slate-300 transition text-slate-600 hover:text-slate-900"
+                          title={language === "pt" ? "Opções" : "Options"}
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10.5 1.5H9.5V3.5H10.5V1.5ZM10.5 8.5H9.5V10.5H10.5V8.5ZM10.5 15.5H9.5V17.5H10.5V15.5Z" />
+                          </svg>
+                        </button>
                       </div>
-                      <div className="text-xs text-slate-500 mt-0.5 sm:mt-1 flex justify-between">
-                        <span>{getMessageCount(chat.messages)} {language === "pt" ? "mensagens" : "messages"}</span>
-                        <span>{formatDate(chat.timestamp)}</span>
-                      </div>
-                    </button>
+
+                      {/* Dropdown menu */}
+                      {openMenuId === chat.id && (
+                        <div className="absolute right-1 sm:right-2 top-full mt-2 bg-white border border-slate-300 rounded-lg shadow-xl z-50 min-w-48">
+                          <button
+                            onClick={(e) => togglePermanent(chat.id, e)}
+                            className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-100 transition rounded-t-lg"
+                          >
+                            {chat.isPermanent 
+                              ? "📌 " + (language === "pt" ? "Remover de guardados" : "Remove from saved")
+                              : "📌 " + (language === "pt" ? "Guardar permanentemente" : "Save permanently")}
+                          </button>
+                          {chat.hasPDF && (
+                            <>
+                              <div className="border-t border-slate-100"></div>
+                              <button
+                                onClick={(e) => downloadPDF(chat, e)}
+                                className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-100 transition"
+                              >
+                                📄 {language === "pt" ? "Fazer download do PDF" : "Download PDF"}
+                              </button>
+                            </>
+                          )}
+                          <div className="border-t border-slate-100"></div>
+                          <button
+                            onClick={(e) => deleteChat(chat.id, e)}
+                            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition last:rounded-b-lg"
+                          >
+                            🗑️ {language === "pt" ? "Eliminar" : "Delete"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
@@ -235,7 +454,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
 
 // Hook to use cache functionality
 export function useChatCache() {
-  const saveChat = (messages: CachedChat["messages"], title: string, chatId?: string) => {
+  const saveChat = (messages: CachedChat["messages"], title: string, chatId?: string, hasPDF?: boolean, extractedData?: CachedChat["extractedData"]) => {
     try {
       const stored = localStorage.getItem("chatbot_cache") || "[]";
       const allChats: CachedChat[] = JSON.parse(stored);
@@ -251,6 +470,8 @@ export function useChatCache() {
           title,
           messages,
           timestamp: Date.now(),
+          hasPDF: hasPDF ?? allChats[existingIndex].hasPDF,
+          extractedData: extractedData ?? allChats[existingIndex].extractedData,
         };
       } else {
         // Create new chat
@@ -259,13 +480,16 @@ export function useChatCache() {
           timestamp: Date.now(),
           title,
           messages,
+          hasPDF: hasPDF || false,
+          extractedData,
         };
         allChats.push(newChat);
       }
 
       const now = Date.now();
       const fortyEightHoursAgo = now - 48 * 60 * 60 * 1000;
-      const filtered = allChats.filter((chat) => chat.timestamp >= fortyEightHoursAgo);
+      // Keep chats from last 48 hours OR permanently saved chats
+      const filtered = allChats.filter((chat) => chat.timestamp >= fortyEightHoursAgo || chat.isPermanent);
 
       localStorage.setItem("chatbot_cache", JSON.stringify(filtered));
       

@@ -34,6 +34,8 @@ export default function ConfigBotComponent() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [generatingPDF, setGeneratingPDF] = useState<boolean>(false);
   const [askedForPDF, setAskedForPDF] = useState<boolean>(false);
+  const [pdfGenerated, setPdfGenerated] = useState<boolean>(false);
+  const [pdfExtractedData, setPdfExtractedData] = useState<any>(null);
 
   const userOnlyMessages = messages.filter((m) => m.role === "user");
   const showLanguageOptions = messages.length === 1 && messages[0]?.role === "assistant";
@@ -222,11 +224,26 @@ export default function ConfigBotComponent() {
   // Listen for cached chat load events
   useEffect(() => {
     const handleLoadCachedChat = (event: any) => {
-      const { messages, chatId } = event.detail;
+      const { messages, chatId, extractedData } = event.detail;
       setMessages(messages);
       setInput("");
       setChatSaved(true); // Mark as saved initially
       setSavedMessageCount(messages.length); // Track the message count of the loaded chat
+      
+      // Check if PDF was generated in this chat
+      const hasPDFMessage = messages.some((m: Message) => 
+        m.role === "assistant" && (
+          m.content.includes("✓ Documento gerado") || 
+          m.content.includes("✓ Document generated") ||
+          m.content.includes("[SUMMARY_PDF]")
+        )
+      );
+      setPdfGenerated(hasPDFMessage);
+      
+      // Restore extracted data if available
+      if (extractedData) {
+        setPdfExtractedData(extractedData);
+      }
       
       // Set the chat ID so future saves update this chat, not create a new one
       if (chatId) {
@@ -456,39 +473,78 @@ export default function ConfigBotComponent() {
   }, [startConversation]);
 
   // Generate title from chat content
-  const generateChatTitle = async (chatMessages: Message[]): Promise<string> => {
+  const generateChatTitle = (chatMessages: Message[]): string => {
     try {
       const userMessages = chatMessages.filter((m) => m.role === "user");
       if (userMessages.length === 0) return "New Chat";
 
-      // Use the first user message as a basis for the title
-      const firstUserMessage = userMessages[0].content;
-      const firstWords = firstUserMessage.split(" ").slice(0, 5).join(" ");
-      
-      // Try to get AI to generate a better title
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: [
-              {
-                role: "user",
-                content: `Generate a short, concise title (3-6 words) for a chat that starts with: "${firstUserMessage}". Only respond with the title, nothing else.`,
-              },
-            ],
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const title = data.reply?.trim() || firstWords;
-          return title.substring(0, 50); // Limit to 50 chars
+      // Check if user selected A or B
+      let serviceType = "";
+      for (const msg of userMessages) {
+        const content = msg.content.trim().toUpperCase();
+        if (content === "A") {
+          serviceType = "Consultoria";
+          break;
+        } else if (content === "B") {
+          serviceType = "Ideacao";
+          break;
         }
-      } catch {
-        // Fallback to first message words
       }
 
-      return firstWords.substring(0, 50);
+      // Find substantial user message - skip trivial ones
+      // Filter out: single words, language selections, short generic responses
+      const trivialPatterns = /^(a|b|sim|não|yes|no|english|portuguese|português|pt|en|ok|ok\.|obrigado|thanks|thank you|graças|please|por favor)$/i;
+      const substantiveMessages = userMessages.filter(
+        (m) => {
+          const trimmed = m.content.trim();
+          // Skip if too short or matches trivial pattern
+          if (trimmed.length < 15 || trivialPatterns.test(trimmed)) {
+            return false;
+          }
+          // Skip if it's mostly a question from the bot (contains mainly common question words)
+          if (/^(what|como|qual|quais|pode|poderia|would|could|can you|pode|o que)/i.test(trimmed)) {
+            return false;
+          }
+          return true;
+        }
+      );
+
+      // If no substantial message found, try to use any non-trivial message
+      let titleMessage = substantiveMessages[0]?.content || 
+                        userMessages.find(m => {
+                          const trimmed = m.content.trim();
+                          return trimmed.length > 5 && !trivialPatterns.test(trimmed);
+                        })?.content ||
+                        "";
+
+      if (!titleMessage) {
+        return serviceType || "New Chat";
+      }
+
+      // Extract first sentence or first 50 characters
+      let titleBase = titleMessage.split(/[.!?]/)[0].trim();
+      
+      // If still too long or empty, truncate to first words
+      if (!titleBase || titleBase.length > 45) {
+        const words = titleMessage.split(" ");
+        titleBase = words.slice(0, 8).join(" ");
+      }
+
+      // Limit to 45 chars and add ellipsis if truncated
+      if (titleBase.length > 45) {
+        titleBase = titleBase.substring(0, 42) + "...";
+      }
+
+      // Combine with service type if available
+      if (serviceType && titleBase.length > 0) {
+        const combined = `${serviceType} - ${titleBase}`;
+        if (combined.length > 55) {
+          return `${serviceType} - ...`;
+        }
+        return combined;
+      }
+
+      return titleBase || serviceType || "New Chat";
     } catch {
       return "New Chat";
     }
@@ -500,8 +556,8 @@ export default function ConfigBotComponent() {
     
     setIsSaving(true);
     try {
-      const title = await generateChatTitle(messages);
-      saveChat(messages, title, currentChatId);
+      const title = generateChatTitle(messages);
+      saveChat(messages, title, currentChatId, pdfGenerated, pdfExtractedData);
       setChatSaved(true);
       setSavedMessageCount(messages.length); // Track message count at save time
       
@@ -671,8 +727,13 @@ export default function ConfigBotComponent() {
           : "✓ Document generated and downloaded successfully!",
       };
       setMessages((prev) => [...prev, pdfMessage]);
+      setPdfExtractedData(extractedData); // Store extracted data for re-downloading
+      setPdfGenerated(true);
       setGeneratingPDF(false);
       setAskedForPDF(false);
+      
+      // Save chat with PDF marker
+      setChatSaved(false); // Force re-save to mark PDF
     } catch (error) {
       console.error("Error generating PDF:", error);
       const errorMessage: Message = {
@@ -706,6 +767,7 @@ export default function ConfigBotComponent() {
     setSavedMessageCount(0);
     setCurrentChatId(`chat_${Date.now()}`);
     setAskedForPDF(false);
+    setPdfGenerated(false);
 
     // Start new conversation
     void startConversation();
