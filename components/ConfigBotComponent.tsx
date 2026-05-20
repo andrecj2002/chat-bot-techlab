@@ -64,6 +64,12 @@ export default function ConfigBotComponent() {
     return /contacto|contato|contact|contact details|follow-up|email|telefone|telemóvel|phone/i.test(text);
   };
 
+  const detectUserContactDetails = (text: string) => {
+    return /@|\b\d{9}\b|\b\d{3}\s?\d{3}\s?\d{3}\b|\b(?:nome|name|email|telefone|phone|telemóvel|mobile|contacto|contato)\b/i.test(
+      text,
+    );
+  };
+
   const getStepFromAssistantReply = (reply: string, fallbackUserCount: number) => {
     if (detectAssistantRequestsContact(reply)) return 6;
     if (detectAssistantRequestsLogistics(reply)) return 5;
@@ -78,6 +84,10 @@ export default function ConfigBotComponent() {
 
   const showInput = !(currentStep === 1 || currentStep === 3);
   const showUploadButton = currentStep >= 4 && userChoice;
+  const contactPromptWasAsked = messages.some(
+    (message) => message.role === "assistant" && detectAssistantRequestsContact(message.content),
+  );
+  const shouldAskForContact = contactAsked || contactPromptWasAsked;
 
   const steps = isEnglishFlow
     ? [
@@ -349,8 +359,24 @@ export default function ConfigBotComponent() {
 
     // Don't call API at step 6 - let the UI handle contact info and PDF generation
     if (currentStep === 6) {
+      const userProvidedContactInfo = detectUserContactDetails(content);
+
+      // If the user is replying with contact details, do not ask for them again.
+      if (userProvidedContactInfo) {
+        setContactAsked(true);
+
+        const askingMessage: Message = {
+          role: "assistant",
+          content: isPortugueseFlow
+            ? "Obrigado pelas informações de contacto! Tenho agora todos os detalhes da sua solicitação. Posso gerar um documento resumo com as informações da conversa. Devo prosseguir com a geração do documento?"
+            : "Thank you for providing your contact information! I now have all the details about your request. I can generate a summary document with the information from our conversation. Should I proceed with generating the document?",
+        };
+        setMessages((prev) => [...prev, askingMessage]);
+        return;
+      }
+
       // First, check if we've already asked for contact info
-      if (!contactAsked) {
+      if (!shouldAskForContact) {
         // Ask for contact information
         const askingContactMessage: Message = {
           role: "assistant",
@@ -651,6 +677,7 @@ export default function ConfigBotComponent() {
                     <GerarResumoBotComponent 
                       messages={messages} 
                       isPortugueseFlow={isPortugueseFlow}
+                      currentChatId={currentChatId}
                     />
                   </div>
                 ) : (m.content.includes("Should I proceed with generating") || m.content.includes("Devo prosseguir com a gera")) ? (
@@ -659,6 +686,7 @@ export default function ConfigBotComponent() {
                     <GerarResumoBotComponent 
                       messages={messages} 
                       isPortugueseFlow={isPortugueseFlow}
+                      currentChatId={currentChatId}
                       showConfirmation={true}
                       onAddMessage={(msg: Message) => setMessages((prev) => [...prev, msg])}
                     />

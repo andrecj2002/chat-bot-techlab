@@ -20,6 +20,26 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Email sending
+
+This app sends generated PDFs using plain SMTP through `nodemailer`.
+
+For a simple real-world test, use a Gmail account with an App Password and set these values in `.env.local`:
+
+```env
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_SECURE=false
+EMAIL_USER=youraddress@gmail.com
+EMAIL_PASSWORD=your_gmail_app_password
+EMAIL_FROM=youraddress@gmail.com
+```
+
+Notes:
+- Gmail requires 2-step verification and an App Password, not your normal login password.
+- The email is sent to `joaoajorge@ua.pt`.
+- If these values are missing, `/api/send-email` will return a clear SMTP configuration error.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

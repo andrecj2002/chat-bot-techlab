@@ -3,10 +3,12 @@
 import { useState, useCallback } from "react";
 import jsPDF from "jspdf";
 import { Message } from "@/utils/types";
+import ContactarEmailComponent from "./contactarEmailComponent";
 
 interface GerarResumoBotComponentProps {
   messages: Message[];
   isPortugueseFlow: boolean;
+  currentChatId?: string;
   onPDFGenerated?: (extractedData: ExtractedData) => void;
   onAskedForPDF?: (asked: boolean) => void;
   showConfirmation?: boolean;
@@ -31,6 +33,7 @@ export default function GerarResumoBotComponent({
   messages, 
   isPortugueseFlow,
   onPDFGenerated,
+  currentChatId,
   onAskedForPDF,
   showConfirmation = false,
   isGenerating: externalIsGenerating = false,
@@ -294,6 +297,23 @@ export default function GerarResumoBotComponent({
             {isPortugueseFlow ? "Descarregar PDF" : "Download PDF"}
           </button>
         </div>
+        
+        {pdfBase64 && (
+          <ContactarEmailComponent
+            pdfBase64={pdfBase64}
+            pdfFileName={`resumo_${pdfExtractedData.empresa}.pdf`}
+            isPortugueseFlow={isPortugueseFlow}
+            extractedData={pdfExtractedData}
+            // pass current chat id so component can prevent duplicate sends per chat
+            currentChatId={currentChatId}
+            onEmailSent={() => {
+              // Optionally add a message to the chat when email sent
+              if (onAddMessage) {
+                onAddMessage({ role: "assistant", content: isPortugueseFlow ? "Email enviado para a Techlab." : "Email sent to Techlab." });
+              }
+            }}
+          />
+        )}
       </div>
     );
   }

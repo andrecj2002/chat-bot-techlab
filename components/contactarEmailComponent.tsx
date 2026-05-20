@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface ExtractedData {
   servico: string;
@@ -18,6 +18,7 @@ interface ContactarEmailComponentProps {
   isPortugueseFlow: boolean;
   extractedData?: ExtractedData;
   onEmailSent?: () => void;
+  currentChatId?: string;
 }
 
 export default function ContactarEmailComponent({
@@ -26,13 +27,32 @@ export default function ContactarEmailComponent({
   isPortugueseFlow,
   extractedData,
   onEmailSent,
+  currentChatId,
 }: ContactarEmailComponentProps) {
   const [isSending, setIsSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showConsent, setShowConsent] = useState(true);
+  const [alreadySent, setAlreadySent] = useState(false);
+
+  // initialize alreadySent from localStorage per chat
+  useEffect(() => {
+    if (!currentChatId) return;
+    try {
+      const key = `emailSent_${currentChatId}`;
+      const v = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
+      if (v) setAlreadySent(true);
+    } catch {
+      // ignore
+    }
+  }, [currentChatId]);
 
   const handleSendEmail = async () => {
+    if (alreadySent) {
+      setError(isPortugueseFlow ? "O email já foi enviado para esta conversa." : "An email has already been sent for this conversation.");
+      return;
+    }
     if (!pdfBase64) {
       setError(
         isPortugueseFlow
@@ -60,18 +80,27 @@ export default function ContactarEmailComponent({
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.message ||
-            (isPortugueseFlow
-              ? "Erro ao enviar email"
-              : "Failed to send email")
+            (isPortugueseFlow ? "Erro ao enviar email" : "Failed to send email")
         );
       }
 
-      setEmailSent(true);
-      setShowConsent(false);
-      onEmailSent?.();
+        // parse response JSON for previewUrl or other info
+        const successData = await response.json().catch(() => ({}));
+        if (successData.previewUrl) setPreviewUrl(successData.previewUrl);
+
+        // Mark as sent (UI + storage) and notify parent
+        setEmailSent(true);
+        setShowConsent(false);
+        try {
+          if (currentChatId && typeof window !== "undefined") {
+            window.localStorage.setItem(`emailSent_${currentChatId}`, "1");
+            setAlreadySent(true);
+          }
+        } catch {}
+        onEmailSent?.();
     } catch (err) {
       const message =
         err instanceof Error
@@ -90,6 +119,22 @@ export default function ContactarEmailComponent({
   };
 
   // Show consent to send email
+  // If an email was already sent for this chat, show an info alert instead of consent
+  if (alreadySent && pdfBase64) {
+    return (
+      <div className="p-4 mb-4 text-sm text-sky-800 rounded-md bg-sky-100" role="alert">
+        <span className="font-medium">
+          {isPortugueseFlow ? "Email já enviado" : "Email already sent"}!
+        </span>
+        <div className="mt-1 text-sm text-sky-700">
+          {isPortugueseFlow
+            ? "Um email já foi enviado para a Techlab nesta conversa."
+            : "An email has already been sent to Techlab for this conversation."}
+        </div>
+      </div>
+    );
+  }
+
   if (showConsent && pdfBase64) {
     return (
       <div className="rounded-3xl rounded-tl-md border border-slate-200 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base leading-6 sm:leading-7 text-slate-900 shadow-sm">
@@ -167,25 +212,19 @@ export default function ContactarEmailComponent({
   // Show success message
   if (emailSent) {
     return (
-      <div className="rounded-3xl rounded-tl-md border border-slate-200 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base leading-6 sm:leading-7 text-slate-900 shadow-sm">
-        <div className="flex items-center gap-3">
-          <svg
-            className="w-5 h-5 text-green-600 flex-shrink-0"
-            fill="currentColor"
-            viewBox="0 0 20 20"
-          >
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <span>
-            {isPortugueseFlow
-              ? "Documento enviado com sucesso para a Techlab!"
-              : "Document successfully sent to Techlab!"}
-          </span>
+      <div className="p-4 mb-4 text-sm text-green-800 rounded-md bg-green-100" role="alert">
+        <div className="font-medium">
+          {isPortugueseFlow ? "Email enviado com sucesso" : "Email sent successfully"}
         </div>
+        {previewUrl && (
+          <div className="mt-1 text-sm">
+            {isPortugueseFlow ? (
+              <a className="underline" href={previewUrl} target="_blank" rel="noreferrer">Visualizar Email</a>
+            ) : (
+              <a className="underline" href={previewUrl} target="_blank" rel="noreferrer">Preview Email</a>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -193,34 +232,19 @@ export default function ContactarEmailComponent({
   // Show error message
   if (error) {
     return (
-      <div className="rounded-3xl rounded-tl-md border border-red-200 bg-red-50 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base leading-6 sm:leading-7 text-red-900 shadow-sm">
-        <div className="flex items-start gap-3">
-          <svg
-            className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5"
-            fill="currentColor"
-            viewBox="0 0 20 20"
+      <div className="p-4 mb-4 text-sm text-red-800 rounded-md bg-red-100" role="alert">
+        <div className="font-medium">{isPortugueseFlow ? "Erro ao enviar email" : "Error sending email"}</div>
+        <div className="mt-1 text-sm">{error}</div>
+        <div className="mt-2">
+          <button
+            onClick={() => {
+              setError(null);
+              setShowConsent(true);
+            }}
+            className="text-sm underline"
           >
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <div className="flex-1">
-            <p className="font-medium">
-              {isPortugueseFlow ? "Erro ao enviar email" : "Error sending email"}
-            </p>
-            <p className="text-xs sm:text-sm mt-1">{error}</p>
-            <button
-              onClick={() => {
-                setError(null);
-                setShowConsent(true);
-              }}
-              className="mt-2 text-xs sm:text-sm underline hover:no-underline font-medium"
-            >
-              {isPortugueseFlow ? "Tentar novamente" : "Try again"}
-            </button>
-          </div>
+            {isPortugueseFlow ? "Tentar novamente" : "Try again"}
+          </button>
         </div>
       </div>
     );
