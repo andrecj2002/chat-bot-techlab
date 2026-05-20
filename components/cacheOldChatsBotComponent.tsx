@@ -2,20 +2,6 @@
 import { useState, useEffect } from "react";
 import "iconify-icon";
 
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      "iconify-icon": IconifyIconProps;
-    }
-  }
-}
-
-interface IconifyIconProps extends React.HTMLAttributes<HTMLElement> {
-  icon: string;
-  width?: string | number;
-  height?: string | number;
-}
-
 export type CachedChat = {
   id: string;
   timestamp: number;
@@ -362,6 +348,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
                 onClick={() => setIsOpen(false)}
                 className="rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
               >
+                {/* @ts-expect-error - Web component type not recognized */}
                 <iconify-icon
                   icon="mdi:close"
                   width="24"
@@ -395,22 +382,28 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
                           <div className="text-xs sm:text-sm font-medium text-slate-900 truncate flex items-center gap-1.5">
                             {chat.title}
                             {chat.isPermanent && (
-                              <iconify-icon
-                                icon="mdi:pin"
-                                width="16"
-                                height="16"
-                                title={language === "pt" ? "Guardado permanentemente" : "Permanently saved"}
-                                style={{ display: 'inline-block', flexShrink: 0 }}
-                              />
+                              <>
+                                {/* @ts-expect-error - Web component type not recognized */}
+                                <iconify-icon
+                                  icon="mdi:pin"
+                                  width="16"
+                                  height="16"
+                                  title={language === "pt" ? "Guardado permanentemente" : "Permanently saved"}
+                                  style={{ display: 'inline-block', flexShrink: 0 }}
+                                />
+                              </>
                             )}
                             {chat.hasPDF && (
-                              <iconify-icon
-                                icon="mdi:file-pdf"
-                                width="16"
-                                height="16"
-                                title={language === "pt" ? "PDF gerado" : "PDF generated"}
-                                style={{ display: 'inline-block', flexShrink: 0 }}
-                              />
+                              <>
+                                {/* @ts-expect-error - Web component type not recognized */}
+                                <iconify-icon
+                                  icon="mdi:file-pdf"
+                                  width="16"
+                                  height="16"
+                                  title={language === "pt" ? "PDF gerado" : "PDF generated"}
+                                  style={{ display: 'inline-block', flexShrink: 0 }}
+                                />
+                              </>
                             )}
                           </div>
                           <div className="text-xs text-slate-500 mt-0.5 sm:mt-1 flex justify-between">
@@ -426,6 +419,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
                           className="flex-shrink-0 p-2 rounded-lg hover:bg-slate-300 transition text-slate-600 hover:text-slate-900"
                           title={language === "pt" ? "Opções" : "Options"}
                         >
+                          {/* @ts-expect-error - Web component type not recognized */}
                           <iconify-icon
                             icon="mdi:dots-vertical"
                             width="20"
@@ -442,6 +436,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
                             onClick={(e) => togglePermanent(chat.id, e)}
                             className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-100 transition rounded-t-lg flex items-center gap-3"
                           >
+                            {/* @ts-expect-error - Web component type not recognized */}
                             <iconify-icon
                               icon="mdi:pin"
                               width="18"
@@ -459,6 +454,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
                                 onClick={(e) => downloadPDF(chat, e)}
                                 className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-100 transition flex items-center gap-3"
                               >
+                                {/* @ts-expect-error - Web component type not recognized */}
                                 <iconify-icon
                                   icon="mdi:file-pdf"
                                   width="18"
@@ -474,6 +470,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
                             onClick={(e) => deleteChat(chat.id, e)}
                             className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition last:rounded-b-lg flex items-center gap-3"
                           >
+                            {/* @ts-expect-error - Web component type not recognized */}
                             <iconify-icon
                               icon="mdi:delete"
                               width="18"

@@ -7,20 +7,6 @@ import EnviarResumoBotComponent from "./EnviarResumoBotComponent";
 import AttachmentDisplay from "./AttachmentDisplay";
 import { FileAttachment } from "@/utils/attachments";
 
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      "iconify-icon": IconifyIconProps;
-    }
-  }
-}
-
-interface IconifyIconProps extends React.HTMLAttributes<HTMLElement> {
-  icon: string;
-  width?: string | number;
-  height?: string | number;
-}
-
 type Message = {
   role: "user" | "assistant";
   content: string;
@@ -47,10 +33,7 @@ export default function ConfigBotComponent() {
   const [pendingAttachments, setPendingAttachments] = useState<FileAttachment[]>([]);
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [generatingPDF, setGeneratingPDF] = useState<boolean>(false);
-  const [askedForPDF, setAskedForPDF] = useState<boolean>(false);
-  const [pdfGenerated, setPdfGenerated] = useState<boolean>(false);
-  const [pdfExtractedData, setPdfExtractedData] = useState<any>(null);
+  const [contactAsked, setContactAsked] = useState<boolean>(false);
 
   const userOnlyMessages = messages.filter((m) => m.role === "user");
   const showLanguageOptions = messages.length === 1 && messages[0]?.role === "assistant";
@@ -93,12 +76,8 @@ export default function ConfigBotComponent() {
     return 1;
   };
 
-  // DURANTE AS OPÇÕES E PEDIDO, ESCONDER INPUT PARA FORÇAR CLIQUE (EVITA RESPOSTAS LIVRES NESSA FASE)
   const showInput = !(currentStep === 1 || currentStep === 3);
   const showUploadButton = currentStep >= 4 && userChoice;
-  
-  // Show PDF confirmation buttons when bot has asked for PDF generation
-  const showPDFConfirmation = askedForPDF && !generatingPDF && messages.length > 0 && messages[messages.length - 1]?.role === "assistant" && (messages[messages.length - 1]?.content.includes("gerar") || messages[messages.length - 1]?.content.includes("generate"));
 
   const steps = isEnglishFlow
     ? [
@@ -118,22 +97,20 @@ export default function ConfigBotComponent() {
         { label: "Contacto" },
       ];
 
-  // Get the steps that should be displayed based on user choice
+  // DISPLAY DOS PASSOS DE ACORDO COM A ESCOLHA DO UTILIZADOR
   const getDisplayedSteps = () => {
     const baseSteps = steps.slice(0, 3);
     if (!userChoice) return baseSteps;
     if (userChoice === "A") return steps;
     if (userChoice === "B") {
-      // Route B: Show steps 1-4 (Language, Company, Options, Brainstorming)
-      // Dynamically add step 5 and 6 as the conversation progresses
+      // SE FOR A ROTA B, MOSTRAR APENAS 2 RESULTADOS
+      // SE O UTILIZADOR QUISER PROSSEGUIR COM A IDEIA PARA O TECHLAB, ADICIONAR ESTES 2
       const routeB = [
         ...baseSteps,
         { label: isEnglishFlow ? "Brainstorming" : "Brainstorming" },
       ];
-      // Add step 5 when bot asks for logistics/finance
       if (currentStep >= 5) {
         routeB.push(steps[4]); // "Logistics & Finance" / "Logística e Finanças"
-        // Also add step 6 as a preview so user knows it's coming next
         routeB.push(steps[5]); // "Contact" / "Contacto"
       }
       return routeB;
@@ -210,6 +187,7 @@ export default function ConfigBotComponent() {
     );
   };
 
+  // INICIO DAS CONVERSAS: MANDAR MENSAGEM (NÃO MOSTRADA) DO UTILIZADOR PARA INICIAR O FLUXO DO BOT
   const startConversation = useCallback(async (): Promise<void> => {
     try {
       const res = await fetch("/api/chat", {
@@ -222,11 +200,9 @@ export default function ConfigBotComponent() {
       const assistantReply = data.reply ?? "";
       const marker: string | null = data.marker ?? null;
       setMessages([{ role: "assistant", content: assistantReply }]);
-      // initial assistant message should keep the flow at step 1 (language selection)
       setCurrentStep(1);
-      setChatSaved(false); // Allow saving new conversations
-      setSavedMessageCount(0); // Reset saved message count
-      // If model unexpectedly requests company details immediately, honor marker
+      setChatSaved(false); 
+      setSavedMessageCount(0); 
       if (marker === "[COMPANY_DETAILS_REQUEST]") setStepIfHigher(2);
     } catch (err) {
       console.error("startConversation error:", err);
@@ -236,39 +212,23 @@ export default function ConfigBotComponent() {
     }
   }, []);
 
-  // Listen for cached chat load events
   useEffect(() => {
     const handleLoadCachedChat = (event: any) => {
-      const { messages, chatId, extractedData } = event.detail;
+      const { messages, chatId } = event.detail;
       setMessages(messages);
       setInput("");
-      setChatSaved(true); // Mark as saved initially
-      setSavedMessageCount(messages.length); // Track the message count of the loaded chat
+      setChatSaved(true); 
+      setSavedMessageCount(messages.length); 
       
-      // Check if PDF was generated in this chat
-      const hasPDFMessage = messages.some((m: Message) => 
-        m.role === "assistant" && (
-          m.content.includes("✓ Documento gerado") || 
-          m.content.includes("✓ Document generated") ||
-          m.content.includes("[SUMMARY_PDF]")
-        )
-      );
-      setPdfGenerated(hasPDFMessage);
-      
-      // Restore extracted data if available
-      if (extractedData) {
-        setPdfExtractedData(extractedData);
-      }
-      
-      // Set the chat ID so future saves update this chat, not create a new one
+      // VERIFICAÇÃO DO ID DO CHAT PARA NÃO SEREM CONSTANTEMENTE GERADAS NOVAS ENTRIES NO MODAL
       if (chatId) {
         setCurrentChatId(chatId);
       }
 
-      // First, detect user choice from messages
       const userMessages = messages.filter((m: Message) => m.role === "user");
       let detectedChoice: "A" | "B" | null = null;
       
+      // DETECTAR SE O UTILIZADOR JÁ ESCOLHEU A ROTA A OU B NA CONVERSA SELECIONADA (CACHED) PARA AJUSTAR O STEP E AS OPÇÕES MOSTRADAS
       for (const msg of userMessages) {
         const content = msg.content.trim().toUpperCase();
         if (content === "A" || content === "B") {
@@ -278,7 +238,7 @@ export default function ConfigBotComponent() {
         }
       }
 
-      // Calculate the correct step based on the loaded conversation
+      // CALCULAR O PASSO CONSOANTE A MENSAGME
       const lastAssistantMessage = messages
         .slice()
         .reverse()
@@ -286,11 +246,9 @@ export default function ConfigBotComponent() {
       
       const userCount = userMessages.length;
       
-      // If user has selected A or B, we're at least at step 4
-      // Use fallback user count logic to determine exact step
+      // FALLBACK PARA DETECTAR O PASSO COM BASE NA ÚLTIMA MENSAGEM DO BOT E NO NÚMERO DE MENSAGENS DO UTILIZADOR, CASO NÃO SEJA POSSÍVEL DETECTAR A ESCOLHA DA ROTA (A OU B) DE FORMA DIRETA
       let calculatedStep = 1;
       if (detectedChoice) {
-        // User has made a choice, so at least step 4
         if (lastAssistantMessage) {
           const detectsContact = /contacto|contato|contact|contact details|follow-up|email|telefone|telemóvel|phone/i.test(lastAssistantMessage.content);
           const detectsLogistics = /deadline|prazo|prazos|financ|orçamento|budget|equipa interna|internal team|timing|timeframe|schedule/i.test(lastAssistantMessage.content);
@@ -300,14 +258,12 @@ export default function ConfigBotComponent() {
           } else if (detectsLogistics) {
             calculatedStep = 5;
           } else {
-            // In brainstorming or awaiting request details
             calculatedStep = 4;
           }
         } else {
           calculatedStep = 4;
         }
       } else {
-        // User hasn't selected A or B yet, use pattern detection
         if (lastAssistantMessage) {
           calculatedStep = getStepFromAssistantReply(lastAssistantMessage.content, userCount);
         } else {
@@ -391,17 +347,33 @@ export default function ConfigBotComponent() {
       setInput("");
     }
 
-    // Special handling for step 6 (contact): instead of calling API, ask about PDF generation
-    if (currentStep === 6 && !askedForPDF) {
-      const askingMessage: Message = {
-        role: "assistant",
-        content: isPortugueseFlow 
-          ? "Obrigado pelas informações de contacto! Tenho agora todos os detalhes da sua solicitação. Posso gerar um documento resumo com as informações da conversa. Devo prosseguir com a geração do documento?"
-          : "Thank you for providing your contact information! I now have all the details about your request. I can generate a summary document with the information from our conversation. Should I proceed with generating the document?",
-      };
-      setMessages((prev) => [...prev, askingMessage]);
-      setAskedForPDF(true);
-      return; // Don't call API
+    // Don't call API at step 6 - let the UI handle contact info and PDF generation
+    if (currentStep === 6) {
+      // First, check if we've already asked for contact info
+      if (!contactAsked) {
+        // Ask for contact information
+        const askingContactMessage: Message = {
+          role: "assistant",
+          content: isPortugueseFlow 
+            ? "Perfeito! Para finalizarmos, poderia fornecer os seus dados de contacto (nome, email, telefone)?"
+            : "Perfect! To finalize, could you please provide your contact details (name, email, phone)?",
+        };
+        setMessages((prev) => [...prev, askingContactMessage]);
+        setContactAsked(true);
+        return; // Don't call API, wait for user to provide contact info
+      }
+      
+      // After contact info is provided, ask for PDF generation
+      if (!messages[messages.length - 1]?.content?.includes("Should I proceed") && !messages[messages.length - 1]?.content?.includes("Devo prosseguir")) {
+        const askingMessage: Message = {
+          role: "assistant",
+          content: isPortugueseFlow 
+            ? "Obrigado pelas informações de contacto! Tenho agora todos os detalhes da sua solicitação. Posso gerar um documento resumo com as informações da conversa. Devo prosseguir com a geração do documento?"
+            : "Thank you for providing your contact information! I now have all the details about your request. I can generate a summary document with the information from our conversation. Should I proceed with generating the document?",
+        };
+        setMessages((prev) => [...prev, askingMessage]);
+        return; // Don't call API
+      }
     }
 
     // immediate step transitions on user actions
@@ -572,7 +544,7 @@ export default function ConfigBotComponent() {
     setIsSaving(true);
     try {
       const title = generateChatTitle(messages);
-      saveChat(messages, title, currentChatId, pdfGenerated, pdfExtractedData);
+      saveChat(messages, title, currentChatId);
       setChatSaved(true);
       setSavedMessageCount(messages.length); // Track message count at save time
       
@@ -596,181 +568,6 @@ export default function ConfigBotComponent() {
     void autoSaveChat();
   }, [currentStep, messages.length, chatSaved, isSaving]);
 
-  // Generate PDF when user confirms
-  const generatePDFDocument = async (extractedData: { empresa: string; servico: string; contexto: string; prazoSolicitado: string; requisitoEspecificos: string; equipa: string; financiamento: string; contacto: string }) => {
-    const jsPDF = (await import("jspdf")).jsPDF;
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-
-    // Set fonts
-    pdf.setFont("Helvetica", "bold");
-    pdf.setFontSize(16);
-    pdf.text("pci · creative science park tech lab", 105, 20, { align: "center" });
-
-    pdf.setFont("Helvetica", "bold");
-    pdf.setFontSize(14);
-      pdf.text(isPortugueseFlow ? "Resumo Gerado pelo Chatbot" : "Summary Generated by Chat-bot", 105, 30, { align: "center" });
-    pdf.setFontSize(12);
-    pdf.text(
-      `${isPortugueseFlow ? "Pedido de" : "Request from"} ${extractedData.empresa}`,
-      105,
-      38,
-      { align: "center" }
-    );
-
-    // Table data
-    const rows = [
-      {
-        categoria: isPortugueseFlow ? "Servico" : "Service",
-        descricao: extractedData.servico || (isPortugueseFlow ? "Nao especificado" : "Not specified"),
-      },
-      {
-        categoria: isPortugueseFlow ? "Contexto" : "Context",
-        descricao: extractedData.contexto || (isPortugueseFlow ? "Nao especificado" : "Not specified"),
-      },
-      {
-        categoria: isPortugueseFlow ? "Prazo Solicitado" : "Requested Timeline",
-        descricao: extractedData.prazoSolicitado || (isPortugueseFlow ? "Nao especificado" : "Not specified"),
-      },
-      {
-        categoria: isPortugueseFlow ? "Requisitos Especificos" : "Specific Requirements",
-        descricao: extractedData.requisitoEspecificos || (isPortugueseFlow ? "Nao especificado" : "Not specified"),
-      },
-      {
-        categoria: isPortugueseFlow ? "Equipa" : "Team",
-        descricao: extractedData.equipa || (isPortugueseFlow ? "Nao especificado" : "Not specified"),
-      },
-      {
-        categoria: isPortugueseFlow ? "Financiamento" : "Financing",
-        descricao: extractedData.financiamento || (isPortugueseFlow ? "Nao especificado" : "Not specified"),
-      },
-      {
-        categoria: isPortugueseFlow ? "Contacto" : "Contact",
-        descricao: extractedData.contacto || (isPortugueseFlow ? "Nao especificado" : "Not specified"),
-      },
-    ];
-
-    // Table styling
-    let currentY = 50;
-
-    // Header
-    pdf.setFont("Helvetica", "bold");
-    pdf.setFontSize(10);
-    pdf.text(isPortugueseFlow ? "Categoria" : "Category", 15, currentY + 8);
-    pdf.text(isPortugueseFlow ? "Descricao" : "Description", 70, currentY + 8);
-    pdf.line(15, currentY + 12, 200, currentY + 12);
-    currentY += 20;
-
-    // Rows
-    pdf.setFont("Helvetica", "normal");
-    pdf.setFontSize(9);
-    rows.forEach((row) => {
-      // Check if we need a new page
-      if (currentY > 270) {
-        pdf.addPage();
-        currentY = 20;
-      }
-
-      // Category
-      pdf.text(row.categoria, 15, currentY);
-
-      // Description (with text wrapping)
-      const descriptionLines = pdf.splitTextToSize(row.descricao, 130);
-      pdf.text(descriptionLines, 70, currentY);
-
-      // Calculate row height based on content
-      const cellHeight = Math.max(10, descriptionLines.length * 6);
-      currentY += cellHeight + 5;
-
-      // Row separator
-      pdf.line(15, currentY - 5, 200, currentY - 5);
-    });
-
-    // Download PDF
-    pdf.save(`resumo_${extractedData.empresa}.pdf`);
-  };
-
-  const handleGeneratePDF = async () => {
-    setGeneratingPDF(true);
-    
-    try {
-      // Try to extract data via API first
-      const extractResponse = await fetch("/api/extract-data", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages, isPortugueseFlow }),
-      });
-
-      let extractedData;
-
-      if (extractResponse.ok) {
-        // API extraction successful
-        const responseData = await extractResponse.json();
-        extractedData = responseData.data;
-      } else {
-        // API failed, use simple local extraction
-        console.warn("API extraction failed, using local extraction");
-        extractedData = {
-          empresa: messages.find((m, i) => m.role === "user" && i > 0 && m.content !== "A" && m.content !== "B")?.content || "Nao especificado",
-          servico: messages.find((m) => m.content === "A")
-            ? "Consultoria/Assessoria"
-            : messages.find((m) => m.content === "B")
-            ? "Brainstorming/Ideacao"
-            : "Nao especificado",
-          contexto: messages.find((m) => m.role === "user" && m.content.length > 50)?.content.slice(0, 200) || "Nao especificado",
-          prazoSolicitado: "Nao especificado",
-          requisitoEspecificos: "Nao especificado",
-          equipa: "Nao especificado",
-          financiamento: "Nao especificado",
-          contacto: messages[messages.length - 2]?.role === "user" ? messages[messages.length - 2]?.content : "Nao especificado",
-        };
-      }
-
-      // Generate and download PDF
-      await generatePDFDocument(extractedData);
-
-      // Add confirmation message
-      const pdfMessage: Message = {
-        role: "assistant",
-        content: isPortugueseFlow 
-          ? "✓ Documento gerado e descarregado com sucesso!" 
-          : "✓ Document generated and downloaded successfully!",
-      };
-      setMessages((prev) => [...prev, pdfMessage]);
-      setPdfExtractedData(extractedData); // Store extracted data for re-downloading
-      setPdfGenerated(true);
-      setGeneratingPDF(false);
-      setAskedForPDF(false);
-      
-      // Save chat with PDF marker
-      setChatSaved(false); // Force re-save to mark PDF
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      const errorMessage: Message = {
-        role: "assistant",
-        content: isPortugueseFlow 
-          ? "Desculpe, houve um erro ao gerar o documento. Tente novamente." 
-          : "Sorry, there was an error generating the document. Please try again.",
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-      setGeneratingPDF(false);
-    }
-  };
-
-  // Reset chat function
-  const redownloadPDF = async () => {
-    if (pdfExtractedData) {
-      try {
-        await generatePDFDocument(pdfExtractedData);
-      } catch (error) {
-        console.error("Error redownloading PDF:", error);
-      }
-    }
-  };
-
   // Reset chat function
   const handleResetChat = async () => {
     setMenuOpen(false);
@@ -790,8 +587,7 @@ export default function ConfigBotComponent() {
     setChatSaved(false);
     setSavedMessageCount(0);
     setCurrentChatId(`chat_${Date.now()}`);
-    setAskedForPDF(false);
-    setPdfGenerated(false);
+    setContactAsked(false);
 
     // Start new conversation
     void startConversation();
@@ -852,26 +648,20 @@ export default function ConfigBotComponent() {
                 {m.content.includes("[SUMMARY_PDF]") ? (
                   <div className="rounded-3xl rounded-tl-md border border-slate-200 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base leading-6 sm:leading-7 text-slate-900 shadow-sm flex flex-col gap-2">
                     <p>{m.content.replace("[SUMMARY_PDF]", "").trim()}</p>
-                    <GerarResumoBotComponent messages={messages} isPortugueseFlow={isPortugueseFlow} />
+                    <GerarResumoBotComponent 
+                      messages={messages} 
+                      isPortugueseFlow={isPortugueseFlow}
+                    />
                   </div>
-                ) : (m.content.includes("Document generated and downloaded successfully") || m.content.includes("Documento gerado e descarregado com sucesso")) ? (
-                  <div className="rounded-3xl rounded-tl-md border border-slate-200 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base leading-6 sm:leading-7 text-slate-900 shadow-sm flex flex-col gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-600 font-semibold">✓</span>
-                      <span>{m.content.replace("✓ ", "").trim()}</span>
-                    </div>
-                    <button
-                      onClick={redownloadPDF}
-                      className="self-start flex items-center gap-2 px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition"
-                    >
-                      <iconify-icon
-                        icon="mdi:download"
-                        width="16"
-                        height="16"
-                        style={{ display: 'inline-block' }}
-                      />
-                      {isPortugueseFlow ? "Descarregar PDF" : "Download PDF"}
-                    </button>
+                ) : (m.content.includes("Should I proceed with generating") || m.content.includes("Devo prosseguir com a gera")) ? (
+                  <div className="rounded-3xl rounded-tl-md border border-slate-200 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base leading-6 sm:leading-7 text-slate-900 shadow-sm flex flex-col gap-2">
+                    <p>{m.content}</p>
+                    <GerarResumoBotComponent 
+                      messages={messages} 
+                      isPortugueseFlow={isPortugueseFlow}
+                      showConfirmation={true}
+                      onAddMessage={(msg: Message) => setMessages((prev) => [...prev, msg])}
+                    />
                   </div>
                 ) : (
                   <div className="rounded-3xl rounded-tl-md border border-slate-200 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base leading-6 sm:leading-7 text-slate-900 shadow-sm">
@@ -888,19 +678,6 @@ export default function ConfigBotComponent() {
             <div className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "-0.3s" }} />
             <div className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "-0.15s" }} />
             <div className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" />
-          </div>
-        )}
-        {generatingPDF && (
-          <div className="mb-4 sm:mb-5 flex flex-col gap-2">
-            <div className="text-sm text-slate-600 font-medium">
-              {isPortugueseFlow ? "A gerar documento..." : "Generating document..."}
-            </div>
-            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-              <div 
-                className="bg-indigo-600 h-full rounded-full animate-pulse"
-                style={{width: '60%'}}
-              ></div>
-            </div>
           </div>
         )}
         <div ref={bottomRef} />
@@ -937,23 +714,6 @@ export default function ConfigBotComponent() {
               className="rounded-full border border-slate-300 bg-white px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
             >
               {isPortugueseFlow ? "B) Explorar uma ideia que tem" : "B) Explore an idea you have"}
-            </button>
-          </div>
-        )}
-
-        {showPDFConfirmation && (
-          <div className="flex flex-wrap gap-2 sm:gap-3 px-1">
-            <button
-              onClick={handleGeneratePDF}
-              className="rounded-full border border-slate-300 bg-white px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
-            >
-              {isPortugueseFlow ? "Sim, gerar documento" : "Yes, generate document"}
-            </button>
-            <button
-              onClick={() => setAskedForPDF(false)}
-              className="rounded-full border border-slate-300 bg-white px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
-            >
-              {isPortugueseFlow ? "Não, continuar conversando" : "No, keep talking"}
             </button>
           </div>
         )}
