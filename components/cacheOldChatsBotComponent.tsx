@@ -1,5 +1,20 @@
 "use client";
 import { useState, useEffect } from "react";
+import "iconify-icon";
+
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      "iconify-icon": IconifyIconProps;
+    }
+  }
+}
+
+interface IconifyIconProps extends React.HTMLAttributes<HTMLElement> {
+  icon: string;
+  width?: string | number;
+  height?: string | number;
+}
 
 export type CachedChat = {
   id: string;
@@ -42,6 +57,24 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
   const [language, setLanguage] = useState<"pt" | "en">("pt");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
+  // Helper function to filter and sort chats
+  const getFilteredAndSortedChats = (allChats: CachedChat[]): CachedChat[] => {
+    const now = Date.now();
+    const fortyEightHoursAgo = now - 48 * 60 * 60 * 1000;
+
+    // Filter: keep chats from last 48 hours OR permanently saved chats
+    const filteredChats = allChats.filter((chat) => chat.timestamp >= fortyEightHoursAgo || chat.isPermanent);
+
+    // Sort: pinned chats first (descending), then by timestamp descending (newest first)
+    filteredChats.sort((a, b) => {
+      if (a.isPermanent && !b.isPermanent) return -1;
+      if (!a.isPermanent && b.isPermanent) return 1;
+      return b.timestamp - a.timestamp;
+    });
+
+    return filteredChats;
+  };
+
   // Load cached chats from localStorage
   const loadCachedChats = () => {
     setLoading(true);
@@ -49,15 +82,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
       const stored = localStorage.getItem("chatbot_cache");
       if (stored) {
         const allChats: CachedChat[] = JSON.parse(stored);
-        const now = Date.now();
-        const fortyEightHoursAgo = now - 48 * 60 * 60 * 1000;
-
-        // Filter: keep chats from last 48 hours OR permanently saved chats
-        const filteredChats = allChats.filter((chat) => chat.timestamp >= fortyEightHoursAgo || chat.isPermanent);
-
-        // Sort by timestamp descending (newest first)
-        filteredChats.sort((a, b) => b.timestamp - a.timestamp);
-
+        const filteredChats = getFilteredAndSortedChats(allChats);
         setCachedChats(filteredChats);
       }
     } catch (error) {
@@ -98,7 +123,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
 
   const clearHistory = () => {
     const confirmMessage = language === "pt" 
-      ? "Tem certeza que deseja deletar todas as conversas (exceto as guardadas permanentemente)? Esta ação não pode ser desfeita."
+      ? "Tem a certeza de que deseja eliminar todas as conversas (exceto as guardadas permanentemente)? Esta ação não pode ser desfeita."
       : "Are you sure you want to delete all chats except permanently saved ones? This cannot be undone.";
     
     if (confirm(confirmMessage)) {
@@ -108,7 +133,8 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
         // Keep only permanently saved chats
         allChats = allChats.filter((chat) => chat.isPermanent);
         localStorage.setItem("chatbot_cache", JSON.stringify(allChats));
-        setCachedChats(allChats);
+        const filteredChats = getFilteredAndSortedChats(allChats);
+        setCachedChats(filteredChats);
       } catch (error) {
         console.error("Error clearing cache:", error);
       }
@@ -125,7 +151,9 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
       if (chatIndex !== -1) {
         allChats[chatIndex].isPermanent = !allChats[chatIndex].isPermanent;
         localStorage.setItem("chatbot_cache", JSON.stringify(allChats));
-        setCachedChats(allChats);
+        const filteredChats = getFilteredAndSortedChats(allChats);
+        setCachedChats(filteredChats);
+        setOpenMenuId(null); // Close menu after toggling
       }
     } catch (error) {
       console.error("Error toggling permanent status:", error);
@@ -135,7 +163,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
   const deleteChat = (chatId: string, event: React.MouseEvent) => {
     event.stopPropagation();
     const confirmMessage = language === "pt" 
-      ? "Tem certeza que deseja deletar esta conversa?"
+      ? "Tem a certeza de que deseja eliminar esta conversa?"
       : "Are you sure you want to delete this chat?";
     
     if (confirm(confirmMessage)) {
@@ -144,7 +172,8 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
         let allChats: CachedChat[] = JSON.parse(stored);
         allChats = allChats.filter((c) => c.id !== chatId);
         localStorage.setItem("chatbot_cache", JSON.stringify(allChats));
-        setCachedChats(allChats);
+        const filteredChats = getFilteredAndSortedChats(allChats);
+        setCachedChats(filteredChats);
         setOpenMenuId(null);
       } catch (error) {
         console.error("Error deleting chat:", error);
@@ -162,13 +191,13 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
         // Fallback if no cached data (shouldn't happen)
         extractedData = {
           empresa: chat.title || "Document",
-          servico: "Nao especificado",
-          contexto: "Nao especificado",
-          prazoSolicitado: "Nao especificado",
-          requisitoEspecificos: "Nao especificado",
-          equipa: "Nao especificado",
-          financiamento: "Nao especificado",
-          contacto: "Nao especificado",
+          servico: "Não especificado",
+          contexto: "Não especificado",
+          prazoSolicitado: "Não especificado",
+          requisitoEspecificos: "Não especificado",
+          equipa: "Não especificado",
+          financiamento: "Não especificado",
+          contacto: "Não especificado",
         };
       }
 
@@ -187,7 +216,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
 
       pdf.setFont("Helvetica", "bold");
       pdf.setFontSize(14);
-      pdf.text(language === "pt" ? "Resumo Gerado pelo Chat-bot" : "Summary Generated by Chat-bot", 105, 30, { align: "center" });
+      pdf.text(language === "pt" ? "Resumo Gerado pelo Chatbot" : "Summary Generated by Chat-bot", 105, 30, { align: "center" });
 
       pdf.setFont("Helvetica", "normal");
       pdf.setFontSize(12);
@@ -201,32 +230,32 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
       // Table data
       const rows = [
         {
-          categoria: language === "pt" ? "Servico" : "Service",
-          descricao: extractedData.servico || (language === "pt" ? "Nao especificado" : "Not specified"),
+          categoria: language === "pt" ? "Serviço" : "Service",
+          descricao: extractedData.servico || (language === "pt" ? "Não especificado" : "Not specified"),
         },
         {
           categoria: language === "pt" ? "Contexto" : "Context",
-          descricao: extractedData.contexto || (language === "pt" ? "Nao especificado" : "Not specified"),
+          descricao: extractedData.contexto || (language === "pt" ? "Não especificado" : "Not specified"),
         },
         {
           categoria: language === "pt" ? "Prazo Solicitado" : "Requested Timeline",
-          descricao: extractedData.prazoSolicitado || (language === "pt" ? "Nao especificado" : "Not specified"),
+          descricao: extractedData.prazoSolicitado || (language === "pt" ? "Não especificado" : "Not specified"),
         },
         {
-          categoria: language === "pt" ? "Requisitos Especificos" : "Specific Requirements",
-          descricao: extractedData.requisitoEspecificos || (language === "pt" ? "Nao especificado" : "Not specified"),
+          categoria: language === "pt" ? "Requisitos Específicos" : "Specific Requirements",
+          descricao: extractedData.requisitoEspecificos || (language === "pt" ? "Não especificado" : "Not specified"),
         },
         {
           categoria: language === "pt" ? "Equipa" : "Team",
-          descricao: extractedData.equipa || (language === "pt" ? "Nao especificado" : "Not specified"),
+          descricao: extractedData.equipa || (language === "pt" ? "Não especificado" : "Not specified"),
         },
         {
           categoria: language === "pt" ? "Financiamento" : "Financing",
-          descricao: extractedData.financiamento || (language === "pt" ? "Nao especificado" : "Not specified"),
+          descricao: extractedData.financiamento || (language === "pt" ? "Não especificado" : "Not specified"),
         },
         {
           categoria: language === "pt" ? "Contacto" : "Contact",
-          descricao: extractedData.contacto || (language === "pt" ? "Nao especificado" : "Not specified"),
+          descricao: extractedData.contacto || (language === "pt" ? "Não especificado" : "Not specified"),
         },
       ];
 
@@ -237,7 +266,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
       pdf.setFont("Helvetica", "bold");
       pdf.setFontSize(10);
       pdf.text(language === "pt" ? "Categoria" : "Category", 15, currentY + 8);
-      pdf.text(language === "pt" ? "Descricao" : "Description", 70, currentY + 8);
+      pdf.text(language === "pt" ? "Descrição" : "Description", 70, currentY + 8);
       pdf.line(15, currentY + 12, 200, currentY + 12);
       currentY += 20;
 
@@ -281,7 +310,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
       if (diffMins < 60) return `${diffMins}m atrás`;
       if (diffHours < 24) return `${diffHours}h atrás`;
       if (diffDays === 1) return "ontem";
-      return date.toLocaleDateString("pt-BR");
+      return date.toLocaleDateString("pt-PT");
     } else {
       if (diffMins < 1) return "just now";
       if (diffMins < 60) return `${diffMins}m ago`;
@@ -308,7 +337,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
       <button
         onClick={() => setIsOpen(true)}
         className="flex items-center gap-1 sm:gap-2 rounded-full border border-slate-300 bg-white px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-900 transition hover:border-slate-900 hover:bg-slate-50"
-        title={language === "pt" ? "Ver conversas dos últimos 48 horas" : "View chats from last 48 hours"}
+        title={language === "pt" ? "Ver últimas conversas (últimas 48 horas)" : "View chats from last 48 hours"}
       >
         <svg className="h-3 sm:h-5 w-3 sm:w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7m18 0a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1m18 0-7.72 6.433a2 2 0 0 1-2.56 0L3 7"/></svg>
         {language === "pt" ? "Últimas Conversas" : "Latest Chats"}
@@ -333,19 +362,12 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
                 onClick={() => setIsOpen(false)}
                 className="rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
               >
-                <svg
-                  className="h-4 sm:h-6 w-4 sm:w-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <iconify-icon
+                  icon="mdi:close"
+                  width="24"
+                  height="24"
+                  style={{ display: 'inline-block' }}
+                />
               </button>
             </div>
 
@@ -353,7 +375,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
             <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-6 py-2 sm:py-4">
               {loading ? (
                 <div className="flex items-center justify-center h-full">
-                  <p className="text-sm text-slate-500">{language === "pt" ? "Carregando conversas..." : "Loading chats..."}</p>
+                  <p className="text-sm text-slate-500">{language === "pt" ? "A carregar conversas..." : "Loading chats..."}</p>
                 </div>
               ) : cachedChats.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
@@ -372,8 +394,24 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
                         <div className="flex-1 min-w-0">
                           <div className="text-xs sm:text-sm font-medium text-slate-900 truncate flex items-center gap-1.5">
                             {chat.title}
-                            {chat.isPermanent && <span title={language === "pt" ? "Guardado permanentemente" : "Permanently saved"}>📌</span>}
-                            {chat.hasPDF && <span title={language === "pt" ? "PDF gerado" : "PDF generated"}>📄</span>}
+                            {chat.isPermanent && (
+                              <iconify-icon
+                                icon="mdi:pin"
+                                width="16"
+                                height="16"
+                                title={language === "pt" ? "Guardado permanentemente" : "Permanently saved"}
+                                style={{ display: 'inline-block', flexShrink: 0 }}
+                              />
+                            )}
+                            {chat.hasPDF && (
+                              <iconify-icon
+                                icon="mdi:file-pdf"
+                                width="16"
+                                height="16"
+                                title={language === "pt" ? "PDF gerado" : "PDF generated"}
+                                style={{ display: 'inline-block', flexShrink: 0 }}
+                              />
+                            )}
                           </div>
                           <div className="text-xs text-slate-500 mt-0.5 sm:mt-1 flex justify-between">
                             <span>{getMessageCount(chat.messages)} {language === "pt" ? "mensagens" : "messages"}</span>
@@ -388,9 +426,12 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
                           className="flex-shrink-0 p-2 rounded-lg hover:bg-slate-300 transition text-slate-600 hover:text-slate-900"
                           title={language === "pt" ? "Opções" : "Options"}
                         >
-                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10.5 1.5H9.5V3.5H10.5V1.5ZM10.5 8.5H9.5V10.5H10.5V8.5ZM10.5 15.5H9.5V17.5H10.5V15.5Z" />
-                          </svg>
+                          <iconify-icon
+                            icon="mdi:dots-vertical"
+                            width="20"
+                            height="20"
+                            style={{ display: 'inline-block' }}
+                          />
                         </button>
                       </div>
 
@@ -399,29 +440,47 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
                         <div className="absolute right-1 sm:right-2 top-full mt-2 bg-white border border-slate-300 rounded-lg shadow-xl z-50 min-w-48">
                           <button
                             onClick={(e) => togglePermanent(chat.id, e)}
-                            className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-100 transition rounded-t-lg"
+                            className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-100 transition rounded-t-lg flex items-center gap-3"
                           >
+                            <iconify-icon
+                              icon="mdi:pin"
+                              width="18"
+                              height="18"
+                              style={{ display: 'inline-block', flexShrink: 0 }}
+                            />
                             {chat.isPermanent 
-                              ? "📌 " + (language === "pt" ? "Remover de guardados" : "Remove from saved")
-                              : "📌 " + (language === "pt" ? "Guardar permanentemente" : "Save permanently")}
+                              ? (language === "pt" ? "Remover de guardados" : "Remove from saved")
+                              : (language === "pt" ? "Guardar permanentemente" : "Save permanently")}
                           </button>
                           {chat.hasPDF && (
                             <>
                               <div className="border-t border-slate-100"></div>
                               <button
                                 onClick={(e) => downloadPDF(chat, e)}
-                                className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-100 transition"
+                                className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-100 transition flex items-center gap-3"
                               >
-                                📄 {language === "pt" ? "Fazer download do PDF" : "Download PDF"}
+                                <iconify-icon
+                                  icon="mdi:file-pdf"
+                                  width="18"
+                                  height="18"
+                                  style={{ display: 'inline-block', flexShrink: 0 }}
+                                />
+                                  {language === "pt" ? "Descarregar PDF" : "Download PDF"}
                               </button>
                             </>
                           )}
                           <div className="border-t border-slate-100"></div>
                           <button
                             onClick={(e) => deleteChat(chat.id, e)}
-                            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition last:rounded-b-lg"
+                            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition last:rounded-b-lg flex items-center gap-3"
                           >
-                            🗑️ {language === "pt" ? "Eliminar" : "Delete"}
+                            <iconify-icon
+                              icon="mdi:delete"
+                              width="18"
+                              height="18"
+                              style={{ display: 'inline-block', flexShrink: 0 }}
+                            />
+                            {language === "pt" ? "Eliminar" : "Delete"}
                           </button>
                         </div>
                       )}

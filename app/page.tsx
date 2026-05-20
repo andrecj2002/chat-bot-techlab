@@ -68,7 +68,7 @@ export default function Home() {
       `}</style>
       <div className="h-screen overflow-hidden text-slate-900 bg-white gradient-bg">
       <header className="flex flex-col sm:flex-row items-center justify-between px-3 sm:px-6 py-2 sm:py-4 gap-2 sm:gap-3 lg:hidden">
-        <Image src="/pci_logo.svg" alt="PCI TechLab logo" width={112} height={28} className="h-5 sm:h-7 w-auto" />
+        <Image src="/pci_logo.svg" alt="PCI TechLab logo" width={112} height={28} className="w-auto" style={{ height: 'auto' }} />
         <div className="flex gap-1.5 sm:gap-3 w-full sm:w-auto">
           <CacheOldChatsBotComponent onLoadChat={() => {}} />
         </div>
@@ -92,7 +92,7 @@ export default function Home() {
 
           {/* Bottom section: logo aligned with step titles */}
           <div className="mt-56">
-            <Image src="/pci_logo.svg" alt="PCI TechLab logo" width={112} height={28} className="h-7 w-auto" />
+            <Image src="/pci_logo.svg" alt="PCI TechLab logo" width={112} height={28} className="w-auto" style={{ height: 'auto' }} />
           </div>
         </aside>
 

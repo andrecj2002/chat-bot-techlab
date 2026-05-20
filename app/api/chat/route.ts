@@ -8,7 +8,6 @@ if (!process.env.ANTHROPIC_API_KEY) {
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const jsonPath = path.join(process.cwd(), "app", "api", "chat", "doc-content.json");
-let cachedDocText = "";
 
 type ServiceItem = {
   name: string;
@@ -26,17 +25,84 @@ type DocContent = {
   services?: ServiceCategory[];
 };
 
-function formatDocJson(doc: DocContent) {
+// Portuguese to English translations for services and categories
+const TRANSLATIONS: Record<string, string> = {
+  // Categories
+  "Produção Visual": "Visual Production",
+  "MoCap": "Motion Capture",
+  "Podcast (Áudio / Vídeo)": "Podcast (Audio / Video)",
+  "Conteúdos Imersivos (AR/VR)": "Immersive Content (AR/VR)",
+  "Digitalização 3D": "3D Digitization",
+  "UX/UI": "UX/UI",
+  "Prototipagem Rápida": "Rapid Prototyping",
+  
+  // Service names
+  "Pequenas Produções Audiovisuais": "Small-Scale Audiovisual Productions",
+  "Produção audiovisual em ambiente virtual — spots publicitários, videoclips e formatos emergentes — combina cenários digitais com captação real em estúdio.": "Audiovisual production in a virtual environment — advertising spots, music videos, and emerging formats — combining digital scenarios with real studio capture.",
+  
+  "Captação de movimento humano em estúdio ou insite": "Human Motion Capture in Studio or On-Site",
+  "Captação de movimento corporal em estúdio para animação, jogos, simulação ou análise biomecânica.": "Capture of body movement in studio for animation, games, simulation, or biomechanical analysis.",
+  
+  "Captação de manuseamento de objectos": "Object Handling Capture",
+  "Captação precisa da interação das mãos com objetos, ideal para treino em diversas áreas ou conteúdo educativo imersivo.": "Precise capture of hand-object interaction, ideal for training in various fields or immersive educational content.",
+  
+  "Captação de movimento de objectos": "Object Movement Capture",
+  "Registo da trajetória e comportamento dinâmico de objetos em movimento, para integração em simulações 3D, testes ou experiências interativas.": "Recording of trajectory and dynamic behavior of moving objects, for integration into 3D simulations, testing, or interactive experiences.",
+  
+  "Vídeocast multicamera": "Multi-Camera Videocast",
+  "Produção com múltiplos ângulos de câmara, iluminação dedicada e edição avançada, para programas com presença visual.": "Production with multiple camera angles, dedicated lighting, and advanced editing for visually-driven programs.",
+  
+  "Consultoria e desenvolvimento de conceitos": "Concept Development and Consulting",
+  "Definição de identidade, formato, estrutura e estratégia editorial do projeto de podcast.": "Definition of identity, format, structure, and editorial strategy for podcast projects.",
+  
+  "Conteúdos Imersivos AR/VR": "AR/VR Immersive Content",
+  "Criação de experiências imersivas em realidade aumentada e virtual — desde filtros e overlays AR até ambientes VR completos para formação, marketing ou entretenimento.": "Creation of immersive experiences in augmented and virtual reality — from AR filters and overlays to complete VR environments for training, marketing, or entertainment.",
+  
+  "Digitalização 3D espacial LiDAR e por Fotogrametria com drone e/ou SLAM scanning": "Spatial 3D Digitization via LiDAR and Drone Photogrammetry with SLAM Scanning",
+  "Levantamento 3D de espaços e terrenos por LiDAR terrestre ou fotogrametria com drone, gerando nuvens de pontos, ortomosaicos e modelos georreferenciados.": "3D surveying of spaces and terrain via terrestrial LiDAR or drone photogrammetry, generating point clouds, orthomosaics, and georeferenced models.",
+  
+  "Digitalização 3D metrológica e não metrológica Laser e/ou IR": "Metrological and Non-Metrological 3D Digitization via Laser and/or IR",
+  "Captura dimensional de alta precisão por laser ou infravermelho (IR), para inspeção, engenharia inversa, arquivo patrimonial de peças e artefactos e modelos tridimensionais genéricos.": "High-precision dimensional capture via laser or infrared (IR) for inspection, reverse engineering, archival documentation of artifacts, and generic 3D models.",
+  
+  "Aplicações web e mobile": "Web and Mobile Applications",
+  "User-Centered Design para aplicações digitais — investigação, arquitetura de informação, wireframes, protótipos e testes de usabilidade.": "User-centered design for digital applications — research, information architecture, wireframes, prototypes, and usability testing.",
+  
+  "Interface humano/máquina": "Human-Machine Interface",
+  "Desenvolvimento de interfaces para equipamentos industriais e sistemas embebidos, priorizando ergonomia, segurança e eficiência operacional.": "Interface development for industrial equipment and embedded systems, prioritizing ergonomics, safety, and operational efficiency.",
+  
+  "Manufactura aditiva FDM e SLA": "Additive Manufacturing (FDM and SLA)",
+  "Impressão 3D por deposição de filamento (FDM) ou resina fotopolimérica (SLA), para protótipos funcionais, maquetas e peças de elevado detalhe.": "3D printing via filament deposition (FDM) or photopolymeric resin (SLA) for functional prototypes, mockups, and highly detailed parts.",
+  
+  "Manufactura subtrativa (CNC)": "Subtractive Manufacturing (CNC)",
+  "Fresagem CNC em madeira, materiais poliméricos e composites para peças estruturais, moldes e protótipos.": "CNC milling in wood, polymeric materials, and composites for structural parts, molds, and prototypes.",
+  
+  "Corte e gravação laser (materiais não metálicos)": "Laser Cutting and Engraving (Non-Metallic Materials)",
+  "Corte e marcação de precisão em acrílico, madeira, cartão e outros materiais não metálicos.": "Precision cutting and marking on acrylic, wood, cardboard, and other non-metallic materials.",
+  
+  "Arduino mockup": "Arduino Mockup",
+  "Criação de protótipos funcionais com eletrónica programável (Arduino), para demonstração de conceito de produtos interativos, IoT e interfaces físicas.": "Creation of functional prototypes with programmable electronics (Arduino) for concept demonstration of interactive products, IoT, and physical interfaces.",
+};
+
+function translateContent(text: string, language: "en" | "pt"): string {
+  if (language === "pt") return text;
+  return TRANSLATIONS[text] || text;
+}
+
+function formatDocJson(doc: DocContent, language: "en" | "pt" = "pt") {
   if (!doc) return "No document content available.";
   const lines: string[] = [];
   if (doc.company) lines.push(`Company: ${doc.company}`);
   if (Array.isArray(doc.services)) {
-    lines.push("Services:");
+    lines.push(language === "en" ? "Services:" : "Serviços:");
     for (const s of doc.services) {
-      lines.push(`- Category: ${s.category}`);
+      const categoryName = translateContent(s.category, language);
+      lines.push(`- Category: ${categoryName}`);
       if (Array.isArray(s.items)) {
         for (const it of s.items) {
-          lines.push(`  - ${it.name}: ${it.description} (min time: ${it.minimum_time ?? "n/a"})`);
+          const serviceName = translateContent(it.name, language);
+          const serviceDescription = translateContent(it.description, language);
+          const minTimeLabel = language === "en" ? "min time" : "tempo mínimo";
+          lines.push(`  - ${serviceName}: ${serviceDescription} (${minTimeLabel}: ${it.minimum_time ?? "n/a"})`);
         }
       }
     }
@@ -44,23 +110,54 @@ function formatDocJson(doc: DocContent) {
   return lines.join("\n");
 }
 
+// Detect conversation language from message history
+function detectLanguage(messages: Message[]): "en" | "pt" {
+  // Look for the assistant's second message or user's language choice
+  if (messages.length >= 2) {
+    const secondMessage = messages[1];
+    if (secondMessage.role === "assistant" && secondMessage.content) {
+      // Check if the assistant's response is in English or Portuguese
+      const content = secondMessage.content.toLowerCase();
+      if (content.includes("briefly characterize") || content.includes("sector, target")) {
+        return "en";
+      }
+      if (content.includes("caracterizar brevemente") || content.includes("setor,")) {
+        return "pt";
+      }
+    }
+  }
+  
+  // Check user's response to language question in second message (index 1)
+  if (messages.length >= 2) {
+    const userResponse = messages[1];
+    if (userResponse.role === "user") {
+      const content = userResponse.content.toLowerCase();
+      if (content.includes("english") || content.includes("en")) {
+        return "en";
+      }
+      if (content.includes("português") || content.includes("portugues") || content.includes("pt")) {
+        return "pt";
+      }
+    }
+  }
+  
+  return "pt"; // Default to Portuguese
+}
+
 // Obter documento com serviços, equipamento, dias. 
-function getDocText(): string {
+function getDocText(language: "en" | "pt" = "pt"): string {
   try {
     const raw = fs.readFileSync(jsonPath, "utf-8").replace(/^\uFEFF/, "");
     if (!raw.trim()) {
-      return cachedDocText || "No document content available.";
+      return "No document content available.";
     }
 
     const parsed = JSON.parse(raw) as DocContent;
-    const formatted = formatDocJson(parsed);
-    if (formatted.trim()) {
-      cachedDocText = formatted;
-    }
-    return cachedDocText || formatted;
+    const formatted = formatDocJson(parsed, language);
+    return formatted;
   } catch (e) {
     console.error("Failed to read/parse doc-content.json.", e);
-    return cachedDocText || "No document content available.";
+    return "No document content available.";
   }
 }
 
@@ -233,6 +330,50 @@ type AnthropicMessageParam = {
   content: string | Anthropic.ContentBlockParam[];
 };
 
+// Helper function to retry API calls with exponential backoff
+async function callAnthropicWithRetry(
+  messages: AnthropicMessageParam[],
+  systemPrompt: string,
+  maxRetries: number = 3
+) {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: messages,
+      });
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      lastError = error;
+
+      // Check if this is a 529 overloaded error that should be retried
+      const unknownError = err as Record<string, unknown>;
+      const statusCode = unknownError?.status as number | undefined;
+      const errorType = unknownError?.error as Record<string, unknown> | undefined;
+      const shouldRetry = errorType?.type === "overloaded_error" || statusCode === 529;
+
+      if (!shouldRetry || attempt === maxRetries) {
+        throw err;
+      }
+
+      // Calculate exponential backoff: 1s, 2s, 4s, 8s
+      const delayMs = Math.pow(2, attempt) * 1000;
+      console.log(
+        `API overloaded (attempt ${attempt + 1}/${maxRetries + 1}). Retrying in ${delayMs}ms...`
+      );
+
+      // Wait before retrying
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw lastError;
+}
+
 export async function POST(req: Request) {
   // Simular que uma primeira mensagem foi mandada (o bot só responde caso haja uma primeira mensagem por parte do User)
     try {
@@ -243,9 +384,14 @@ export async function POST(req: Request) {
         ? incoming
         : [{ role: "user", content: "Hello" }];
 
-    const docText = getDocText();
+    const conversationLanguage = detectLanguage(messages);
+    const docText = getDocText(conversationLanguage);
 
-    const systemPrompt = `${SYSTEM_PROMPT_TEMPLATE}\n\n${RESPONSE_STYLE}\n${RESPONSE_STYLE_EXTRA}\n${MARKER_REMINDER}\n\n--- DOCUMENT ---\n${docText}`;
+    const languageInstructions = conversationLanguage === "en" 
+      ? "\n\nIMPORTANT: You are responding in English. Use the English service names from the document below. Never use Portuguese service names when responding in English."
+      : "";
+
+    const systemPrompt = `${SYSTEM_PROMPT_TEMPLATE}\n\n${RESPONSE_STYLE}\n${RESPONSE_STYLE_EXTRA}\n${MARKER_REMINDER}${languageInstructions}\n\n--- DOCUMENT ---\n${docText}`;
 
     // Convert messages to Anthropic format, handling attachments
     const anthropicMessages: AnthropicMessageParam[] = messages.map((msg) => {
@@ -319,12 +465,7 @@ export async function POST(req: Request) {
       };
     });
 
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: anthropicMessages,
-    });
+    const response = await callAnthropicWithRetry(anthropicMessages, systemPrompt);
 
     const reply = response.content[0];
     if (reply.type !== "text") {
