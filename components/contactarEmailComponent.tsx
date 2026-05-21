@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 interface ExtractedData {
   servico: string;
@@ -34,19 +34,15 @@ export default function ContactarEmailComponent({
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showConsent, setShowConsent] = useState(true);
-  const [alreadySent, setAlreadySent] = useState(false);
+  const [alreadySent, setAlreadySent] = useState<boolean>(() => {
+    if (!currentChatId || typeof window === "undefined") return false;
 
-  // initialize alreadySent from localStorage per chat
-  useEffect(() => {
-    if (!currentChatId) return;
     try {
-      const key = `emailSent_${currentChatId}`;
-      const v = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
-      if (v) setAlreadySent(true);
+      return Boolean(window.localStorage.getItem(`emailSent_${currentChatId}`));
     } catch {
-      // ignore
+      return false;
     }
-  }, [currentChatId]);
+  });
 
   const handleSendEmail = async () => {
     if (alreadySent) {
@@ -119,22 +115,6 @@ export default function ContactarEmailComponent({
   };
 
   // Show consent to send email
-  // If an email was already sent for this chat, show an info alert instead of consent
-  if (alreadySent && pdfBase64) {
-    return (
-      <div className="p-4 mb-4 text-sm text-sky-800 rounded-md bg-sky-100" role="alert">
-        <span className="font-medium">
-          {isPortugueseFlow ? "Email já enviado" : "Email already sent"}!
-        </span>
-        <div className="mt-1 text-sm text-sky-700">
-          {isPortugueseFlow
-            ? "Um email já foi enviado para a Techlab nesta conversa."
-            : "An email has already been sent to Techlab for this conversation."}
-        </div>
-      </div>
-    );
-  }
-
   if (showConsent && pdfBase64) {
     return (
       <div className="rounded-3xl rounded-tl-md border border-slate-200 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base leading-6 sm:leading-7 text-slate-900 shadow-sm">
@@ -225,6 +205,22 @@ export default function ContactarEmailComponent({
             )}
           </div>
         )}
+      </div>
+    );
+  }
+
+  // If an email was already sent for this chat, show an info alert instead of consent
+  if (alreadySent && pdfBase64) {
+    return (
+      <div className="p-4 mb-4 text-sm text-sky-800 rounded-md bg-sky-100" role="alert">
+        <span className="font-medium">
+          {isPortugueseFlow ? "Email já enviado" : "Email already sent"}!
+        </span>
+        <div className="mt-1 text-sm text-sky-700">
+          {isPortugueseFlow
+            ? "Um email já foi enviado para a Techlab nesta conversa."
+            : "An email has already been sent to Techlab for this conversation."}
+        </div>
       </div>
     );
   }

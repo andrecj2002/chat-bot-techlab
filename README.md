@@ -36,6 +36,7 @@ EMAIL_FROM=youraddress@gmail.com
 ```
 
 Notes:
+
 - Gmail requires 2-step verification and an App Password, not your normal login password.
 - The email is sent to `joaoajorge@ua.pt`.
 - If these values are missing, `/api/send-email` will return a clear SMTP configuration error.

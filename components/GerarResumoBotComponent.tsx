@@ -300,6 +300,7 @@ export default function GerarResumoBotComponent({
         
         {pdfBase64 && (
           <ContactarEmailComponent
+            key={currentChatId ?? "email-component"}
             pdfBase64={pdfBase64}
             pdfFileName={`resumo_${pdfExtractedData.empresa}.pdf`}
             isPortugueseFlow={isPortugueseFlow}

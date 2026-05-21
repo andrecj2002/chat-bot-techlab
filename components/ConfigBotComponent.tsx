@@ -34,6 +34,7 @@ export default function ConfigBotComponent() {
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [contactAsked, setContactAsked] = useState<boolean>(false);
+  const [routeBProceedToTechlab, setRouteBProceedToTechlab] = useState<boolean>(false);
 
   const userOnlyMessages = messages.filter((m) => m.role === "user");
   const showLanguageOptions = messages.length === 1 && messages[0]?.role === "assistant";
@@ -70,6 +71,12 @@ export default function ConfigBotComponent() {
     );
   };
 
+  const detectRouteBProceeding = (text: string) => {
+    return /\b(?:proceed|continue|continuar|prosseguir|seguir|go ahead|move forward|develop further|further develop|contact techlab|contactar.*techlab|contactar.*pci|contact.*techlab|contact.*pci|pode contactar|vamos em frente|vamos prosseguir|quero seguir|quero avançar|sim|yes|ok|okay|claro|sure)\b/i.test(
+      text,
+    );
+  };
+
   const getStepFromAssistantReply = (reply: string, fallbackUserCount: number) => {
     if (detectAssistantRequestsContact(reply)) return 6;
     if (detectAssistantRequestsLogistics(reply)) return 5;
@@ -88,6 +95,7 @@ export default function ConfigBotComponent() {
     (message) => message.role === "assistant" && detectAssistantRequestsContact(message.content),
   );
   const shouldAskForContact = contactAsked || contactPromptWasAsked;
+  const routeBCanAdvance = userChoice !== "B" || routeBProceedToTechlab;
 
   const steps = isEnglishFlow
     ? [
@@ -113,13 +121,8 @@ export default function ConfigBotComponent() {
     if (!userChoice) return baseSteps;
     if (userChoice === "A") return steps;
     if (userChoice === "B") {
-      // SE FOR A ROTA B, MOSTRAR APENAS 2 RESULTADOS
-      // SE O UTILIZADOR QUISER PROSSEGUIR COM A IDEIA PARA O TECHLAB, ADICIONAR ESTES 2
-      const routeB = [
-        ...baseSteps,
-        { label: isEnglishFlow ? "Brainstorming" : "Brainstorming" },
-      ];
-      if (currentStep >= 5) {
+      const routeB = [...baseSteps, { label: isEnglishFlow ? "Brainstorming" : "Brainstorming" }];
+      if (routeBProceedToTechlab && currentStep >= 5) {
         routeB.push(steps[4]); // "Logistics & Finance" / "Logística e Finanças"
         routeB.push(steps[5]); // "Contact" / "Contacto"
       }
@@ -213,6 +216,7 @@ export default function ConfigBotComponent() {
       setCurrentStep(1);
       setChatSaved(false); 
       setSavedMessageCount(0); 
+      setRouteBProceedToTechlab(false);
       if (marker === "[COMPANY_DETAILS_REQUEST]") setStepIfHigher(2);
     } catch (err) {
       console.error("startConversation error:", err);
@@ -236,6 +240,12 @@ export default function ConfigBotComponent() {
       }
 
       const userMessages = messages.filter((m: Message) => m.role === "user");
+      const routeBContinueDetected = messages.some(
+        (message: Message) =>
+          (message.role === "user" && detectRouteBProceeding(message.content)) ||
+          (message.role === "assistant" && /LOGISTICS_FINANCE_REQUEST|CONTACT_REQUEST|deadline|prazo|budget|orçamento|contacto|contact details|techlab/i.test(message.content)),
+      );
+      setRouteBProceedToTechlab(routeBContinueDetected);
       let detectedChoice: "A" | "B" | null = null;
       
       // DETECTAR SE O UTILIZADOR JÁ ESCOLHEU A ROTA A OU B NA CONVERSA SELECIONADA (CACHED) PARA AJUSTAR O STEP E AS OPÇÕES MOSTRADAS
@@ -423,6 +433,13 @@ export default function ConfigBotComponent() {
       const choice = content.trim().toUpperCase() as "A" | "B";
       setUserChoice(choice);
       setStepIfHigher(4);
+      if (choice === "B") {
+        setRouteBProceedToTechlab(false);
+      }
+    }
+
+    if (currentStep === 4 && userChoice === "B" && detectRouteBProceeding(content)) {
+      setRouteBProceedToTechlab(true);
     }
 
     setLoading(true);
@@ -446,13 +463,26 @@ export default function ConfigBotComponent() {
       } else if (marker === "[AWAITING_REQUEST]") {
         setStepIfHigher(4);
       } else if (marker === "[LOGISTICS_FINANCE_REQUEST]") {
-        setStepIfHigher(5);
+        if (routeBCanAdvance) {
+          setStepIfHigher(5);
+        } else {
+          setStepIfHigher(4);
+        }
       } else if (marker === "[CONTACT_REQUEST]") {
-        setStepIfHigher(6);
+        if (routeBCanAdvance) {
+          setStepIfHigher(6);
+        } else {
+          setStepIfHigher(4);
+        }
       } else {
         // Fallback heuristics (best-effort)
         const userCount = updated.filter((m) => m.role === "user").length;
-        setStepIfHigher(getStepFromAssistantReply(assistantReply, userCount));
+        const nextStep = getStepFromAssistantReply(assistantReply, userCount);
+        if (routeBCanAdvance) {
+          setStepIfHigher(nextStep);
+        } else {
+          setStepIfHigher(Math.min(nextStep, 4));
+        }
       }
     } catch (err) {
       console.error("sendMessage error:", err);
@@ -614,6 +644,7 @@ export default function ConfigBotComponent() {
     setSavedMessageCount(0);
     setCurrentChatId(`chat_${Date.now()}`);
     setContactAsked(false);
+    setRouteBProceedToTechlab(false);
 
     // Start new conversation
     void startConversation();
