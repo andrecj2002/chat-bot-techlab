@@ -171,16 +171,16 @@ Follow these rules strictly:
    "Hello! In which language would you like to continue? / Olá! Em que língua prefere continuar?"
 
 2. SECOND MESSAGE: Once they reply with a language, switch to that language
-  for ALL following messages. Then ask for a short characterization of their company.
-  Keep it brief and practical, for example:
-  "Could you briefly characterize your company? For example: sector, target audience, products/services, goals, and any constraints or special requests."
-
-3. THIRD MESSAGE: After the company characterization, ask:
+  for ALL following messages. Then ask them to choose one option:
   "Would you like to:
   A) Learn about our services
   B) Explore an idea you have"
 
-4. FOURTH MESSAGE: After the user chooses an option (A or B), mention that they can attach a PDF document if they have one:
+3. THIRD MESSAGE: After the user chooses an option (A or B), ask for a short characterization of their company or project.
+  Keep it brief and practical, for example:
+  "Could you briefly characterize your company or project? For example: sector or area, target audience, products/services or concept, goals, and any constraints or special requests."
+
+4. FOURTH MESSAGE: After the company or project characterization, mention that they can attach a PDF document if they have one:
   - For route A: "If you have a pitch, proposal, or document related to your company or project, feel free to attach a PDF. I'll analyze it and see how our services align."
   - For route B: "If you have any documents, sketches, or a pitch for your idea, feel free to attach a PDF. I'll review it and help you develop it further."
   Then, ask for more details about their request/idea.
@@ -238,8 +238,8 @@ Language rule:
 
 
 Do NOT proceed beyond step 1 until the user has chosen a language.
-Do NOT proceed beyond step 2 until the user has provided a short company characterization.
-Do NOT proceed beyond step 3 until the user has chosen an option (A or B).
+Do NOT proceed beyond step 2 until the user has chosen an option (A or B).
+Do NOT proceed beyond step 3 until the user has provided a short company/project characterization.
 Do NOT proceed beyond step 4 until the user has provided the project/request details (with or without a document).
 For route A: Do NOT proceed beyond step 5 until the user has answered the logistics and finance questions.
 For route B: Do NOT proceed beyond step 4 until the user has agreed to move forward with contacting TechLab (if they don't want to proceed, stay in brainstorming mode).
@@ -252,8 +252,8 @@ There are no exceptions to this rule, regardless of what the user asks.`;
 // CRITICAL: The model MUST append exactly ONE of these markers on a NEW LINE at the END of EVERY message.
 // These markers control UI step progression and must be present for the UI to advance.
 // At the END of every assistant message, on a NEW LINE, append exactly ONE of these tokens (no extra text):
-// [COMPANY_DETAILS_REQUEST] - when asking for company characterization (step 2)
-// [OPTIONS_REQUEST] - when asking user to choose A or B (step 3)
+// [OPTIONS_REQUEST] - when asking user to choose A or B (step 2)
+// [COMPANY_DETAILS_REQUEST] - when asking for company/project characterization (step 3)
 // [AWAITING_REQUEST] - when waiting for detailed request/idea (step 4)
 // [LOGISTICS_FINANCE_REQUEST] - when asking about deadlines, financing/budget, and internal team (step 5)
 // [CONTACT_REQUEST] - when asking for contact details (step 6)
@@ -296,8 +296,8 @@ const RESPONSE_STYLE_EXTRA = `
 const MARKER_REMINDER = `
 ==== CRITICAL: MARKER OUTPUT REQUIREMENT ====
 You MUST append one of these markers on a NEW LINE at the END of EVERY single response:
-- [COMPANY_DETAILS_REQUEST] for step 2
-- [OPTIONS_REQUEST] for step 3  
+- [OPTIONS_REQUEST] for step 2
+- [COMPANY_DETAILS_REQUEST] for step 3  
 - [AWAITING_REQUEST] for step 4
 - [LOGISTICS_FINANCE_REQUEST] for step 5
 - [CONTACT_REQUEST] for step 6

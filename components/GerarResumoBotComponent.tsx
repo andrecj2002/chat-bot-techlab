@@ -29,6 +29,47 @@ export interface ExtractedData {
   contacto: string;
 }
 
+const detectRouteBProceeding = (text: string) => {
+  return /\b(?:proceed|continue|continuar|prosseguir|seguir|go ahead|move forward|develop further|further develop|contact techlab|contactar.*techlab|contactar.*pci|contact.*techlab|contact.*pci|pode contactar|vamos em frente|vamos prosseguir|quero seguir|quero avançar|sim|yes|ok|okay|claro|sure)\b/i.test(
+    text,
+  );
+};
+
+const hasRouteBProceedSignal = (messages: Message[]) =>
+  messages.some((message) => message.role === "user" && detectRouteBProceeding(message.content));
+
+const inferServiceFromConversation = (messages: Message[], isPortugueseFlow: boolean) => {
+  const conversation = messages.map((message) => message.content).join(" ").toLowerCase();
+
+  if (/web|website|site|app|aplicação|aplicacao|mobile|ux|ui|interface|wireframe|prototype|protótipo|prototipo|usability|usabilidade/.test(conversation)) {
+    return isPortugueseFlow ? "Aplicações web e mobile" : "Web and Mobile Applications";
+  }
+
+  if (/ar\/vr|vr|realidade aumentada|realidade virtual|immersive|imersivo|imersiva/.test(conversation)) {
+    return isPortugueseFlow ? "Conteúdos Imersivos AR/VR" : "AR/VR Immersive Content";
+  }
+
+  if (/podcast|videocast|áudio|audio|vídeo|video/.test(conversation)) {
+    return isPortugueseFlow ? "Consultoria e desenvolvimento de conceitos" : "Concept Development and Consulting";
+  }
+
+  if (/motion capture|mocap|movimento|capture|captação|captacao|object|objectos|objects/.test(conversation)) {
+    return isPortugueseFlow ? "Captação de movimento humano em estúdio ou insite" : "Human Motion Capture in Studio or On-Site";
+  }
+
+  if (/3d|lidar|fotogrametria|scan|scanner|digitalização|digitalizacao|laser|ir/.test(conversation)) {
+    return isPortugueseFlow
+      ? "Digitalização 3D espacial LiDAR e por Fotogrametria com drone e/ou SLAM scanning"
+      : "Spatial 3D Digitization via LiDAR and Drone Photogrammetry with SLAM Scanning";
+  }
+
+  if (/cnc|fdm|sla|impressão 3d|impressao 3d|laser cut|corte laser|arduino|protótipo físico|prototipo fisico/.test(conversation)) {
+    return isPortugueseFlow ? "Manufactura aditiva FDM e SLA" : "Additive Manufacturing (FDM and SLA)";
+  }
+
+  return isPortugueseFlow ? "Serviço PCI-TechLab mais adequado" : "Most relevant PCI-TechLab service";
+};
+
 export default function GerarResumoBotComponent({ 
   messages, 
   isPortugueseFlow,
@@ -155,7 +196,11 @@ export default function GerarResumoBotComponent({
       const extractResponse = await fetch("/api/extract-data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages, isPortugueseFlow }),
+        body: JSON.stringify({
+          messages,
+          isPortugueseFlow,
+          routeBProceedToTechlab: hasRouteBProceedSignal(messages),
+        }),
       });
 
       let extractedData: ExtractedData;
@@ -172,7 +217,7 @@ export default function GerarResumoBotComponent({
           servico: messages.find((m) => m.content === "A")
             ? "Consultoria/Assessoria"
             : messages.find((m) => m.content === "B")
-            ? "Brainstorming/Ideacao"
+            ? inferServiceFromConversation(messages, isPortugueseFlow)
             : "Nao especificado",
           contexto: messages.find((m) => m.role === "user" && m.content.length > 50)?.content.slice(0, 200) || "Nao especificado",
           prazoSolicitado: "Nao especificado",

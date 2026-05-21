@@ -16,7 +16,11 @@ type Message = {
 export default function ConfigBotComponent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const setStepIfHigher = (step: number) => setCurrentStep((prev) => Math.max(prev, step));
+  const setStepIfHigher = (step: number) =>
+    setCurrentStep((prev) => {
+      const boundedStep = userChoice === "B" && !routeBCanAdvance ? Math.min(step, 4) : step;
+      return Math.max(prev, boundedStep);
+    });
   const [input, setInput] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -39,7 +43,7 @@ export default function ConfigBotComponent() {
   const userOnlyMessages = messages.filter((m) => m.role === "user");
   const showLanguageOptions = messages.length === 1 && messages[0]?.role === "assistant";
   
-  const showChoiceOptions = !loading && currentStep === 3;
+  const showChoiceOptions = !loading && currentStep === 2;
   const firstUserLanguage = userOnlyMessages[0]?.content?.trim().toLowerCase() ?? "";
   const isEnglishFlow = firstUserLanguage.includes("english") || firstUserLanguage === "en";
   const isPortugueseFlow = !isEnglishFlow;
@@ -65,6 +69,12 @@ export default function ConfigBotComponent() {
     return /contacto|contato|contact|contact details|follow-up|email|telefone|telemóvel|phone/i.test(text);
   };
 
+  const detectAssistantRequestsCompanyDetails = (text: string) => {
+    return /briefly characterize|characterize your company|characterize your project|company or project|sector or area|target audience|products\/services or concept|goals|constraints or special requests|caracterizar|empresa|projeto|setor|área|público-alvo|objetivos|restrições/i.test(
+      text,
+    );
+  };
+
   const detectUserContactDetails = (text: string) => {
     return /@|\b\d{9}\b|\b\d{3}\s?\d{3}\s?\d{3}\b|\b(?:nome|name|email|telefone|phone|telemóvel|mobile|contacto|contato)\b/i.test(
       text,
@@ -77,39 +87,45 @@ export default function ConfigBotComponent() {
     );
   };
 
+  const routeBProceedSignalExists = messages.some(
+    (message) => message.role === "user" && detectRouteBProceeding(message.content),
+  );
+
   const getStepFromAssistantReply = (reply: string, fallbackUserCount: number) => {
     if (detectAssistantRequestsContact(reply)) return 6;
     if (detectAssistantRequestsLogistics(reply)) return 5;
-    if (detectAssistantProvidedOptions(reply)) return 3;
-    if (detectAssistantWantsDetails(reply)) return 2;
+    if (detectAssistantRequestsCompanyDetails(reply)) return 3;
+    if (detectAssistantProvidedOptions(reply)) return 2;
+    if (detectAssistantWantsDetails(reply)) return 4;
 
     if (fallbackUserCount >= 5) return 6;
     if (fallbackUserCount >= 4) return 5;
     if (fallbackUserCount >= 3) return 4;
+    if (fallbackUserCount >= 2) return 3;
     return 1;
   };
 
-  const showInput = !(currentStep === 1 || currentStep === 3);
+  const showInput = !(currentStep === 1 || currentStep === 2);
   const showUploadButton = currentStep >= 4 && userChoice;
   const contactPromptWasAsked = messages.some(
     (message) => message.role === "assistant" && detectAssistantRequestsContact(message.content),
   );
   const shouldAskForContact = contactAsked || contactPromptWasAsked;
-  const routeBCanAdvance = userChoice !== "B" || routeBProceedToTechlab;
+  const routeBCanAdvance = userChoice !== "B" || routeBProceedToTechlab || routeBProceedSignalExists;
 
   const steps = isEnglishFlow
     ? [
         { label: "Language" },
-        { label: "Company" },
         { label: "Options" },
+        { label: "Company" },
         { label: "Request" },
         { label: "Logistics & Finance" },
         { label: "Contact" },
       ]
     : [
         { label: "Língua" },
-        { label: "Empresa" },
         { label: "Opções" },
+        { label: "Empresa" },
         { label: "Pedido" },
         { label: "Logística e Finanças" },
         { label: "Contacto" },
@@ -243,7 +259,7 @@ export default function ConfigBotComponent() {
       const routeBContinueDetected = messages.some(
         (message: Message) =>
           (message.role === "user" && detectRouteBProceeding(message.content)) ||
-          (message.role === "assistant" && /LOGISTICS_FINANCE_REQUEST|CONTACT_REQUEST|deadline|prazo|budget|orçamento|contacto|contact details|techlab/i.test(message.content)),
+          (message.role === "assistant" && /\[LOGISTICS_FINANCE_REQUEST\]|\[CONTACT_REQUEST\]/.test(message.content)),
       );
       setRouteBProceedToTechlab(routeBContinueDetected);
       let detectedChoice: "A" | "B" | null = null;
@@ -270,13 +286,17 @@ export default function ConfigBotComponent() {
       let calculatedStep = 1;
       if (detectedChoice) {
         if (lastAssistantMessage) {
+          const detectsCompanyDetails = detectAssistantRequestsCompanyDetails(lastAssistantMessage.content);
           const detectsContact = /contacto|contato|contact|contact details|follow-up|email|telefone|telemóvel|phone/i.test(lastAssistantMessage.content);
           const detectsLogistics = /deadline|prazo|prazos|financ|orçamento|budget|equipa interna|internal team|timing|timeframe|schedule/i.test(lastAssistantMessage.content);
+          const allowRouteBProgress = detectedChoice !== "B" || routeBContinueDetected;
           
-          if (detectsContact) {
+          if (allowRouteBProgress && detectsContact) {
             calculatedStep = 6;
-          } else if (detectsLogistics) {
+          } else if (allowRouteBProgress && detectsLogistics) {
             calculatedStep = 5;
+          } else if (detectsCompanyDetails) {
+            calculatedStep = 3;
           } else {
             calculatedStep = 4;
           }
@@ -289,6 +309,10 @@ export default function ConfigBotComponent() {
         } else {
           calculatedStep = 1;
         }
+      }
+
+      if (detectedChoice === "B" && !routeBContinueDetected) {
+        calculatedStep = Math.min(calculatedStep, 4);
       }
 
       setCurrentStep(calculatedStep);
@@ -432,7 +456,7 @@ export default function ConfigBotComponent() {
     if (/^[a-d]$/i.test(content.trim())) {
       const choice = content.trim().toUpperCase() as "A" | "B";
       setUserChoice(choice);
-      setStepIfHigher(4);
+      setStepIfHigher(3);
       if (choice === "B") {
         setRouteBProceedToTechlab(false);
       }
@@ -457,9 +481,9 @@ export default function ConfigBotComponent() {
 
       // Prefer deterministic marker if provided by server/model
       if (marker === "[COMPANY_DETAILS_REQUEST]") {
-        setStepIfHigher(2);
-      } else if (marker === "[OPTIONS_REQUEST]") {
         setStepIfHigher(3);
+      } else if (marker === "[OPTIONS_REQUEST]") {
+        setStepIfHigher(2);
       } else if (marker === "[AWAITING_REQUEST]") {
         setStepIfHigher(4);
       } else if (marker === "[LOGISTICS_FINANCE_REQUEST]") {
@@ -478,11 +502,7 @@ export default function ConfigBotComponent() {
         // Fallback heuristics (best-effort)
         const userCount = updated.filter((m) => m.role === "user").length;
         const nextStep = getStepFromAssistantReply(assistantReply, userCount);
-        if (routeBCanAdvance) {
-          setStepIfHigher(nextStep);
-        } else {
-          setStepIfHigher(Math.min(nextStep, 4));
-        }
+        setStepIfHigher(routeBCanAdvance ? nextStep : Math.min(nextStep, 4));
       }
     } catch (err) {
       console.error("sendMessage error:", err);

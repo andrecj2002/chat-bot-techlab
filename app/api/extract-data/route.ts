@@ -16,23 +16,34 @@ interface ExtractedData {
 
 export async function POST(request: Request) {
   try {
-    const { messages, isPortugueseFlow } = (await request.json()) as {
+    const { messages, isPortugueseFlow, routeBProceedToTechlab } = (await request.json()) as {
       messages: Message[];
       isPortugueseFlow: boolean;
+      routeBProceedToTechlab?: boolean;
     };
+    const routeBIsActive = Boolean(routeBProceedToTechlab);
 
     // Build conversation text for analysis
     const conversationText = messages
       .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
       .join("\n");
+    const routeBInstruction = routeBIsActive
+      ? isPortugueseFlow
+        ? "\n\nA conversa está na Rota B e o utilizador já concordou explicitamente em prosseguir com a PCI-TechLab."
+        : "\n\nThe conversation is on Route B and the user has explicitly agreed to proceed with PCI-TechLab."
+      : "";
 
     const extractionPrompt = isPortugueseFlow
-      ? `Analisa a seguinte conversa com um cliente e extrai as informações estruturadas solicitadas. 
-       
+      ? `Analisa a seguinte conversa com um cliente e extrai as informações estruturadas solicitadas.
+
 Conversa:
 ${conversationText}
 
-Extrai e sintetiza as seguintes informações da conversa. Para cada campo, fornece a informação mais completa e relevante, combinando informações de múltiplas mensagens se necessário. Não faças citações diretas dos utilizadores - sintetiza as informações de forma natural e profissional.
+Extrai e sintetiza as seguintes informações da conversa. Para cada campo, fornece a informação mais completa e relevante, combinando informações de múltiplas mensagens se necessário. Não faças citações diretas dos utilizadores - sintetiza as informações de forma natural e profissional.${routeBInstruction}
+
+Para o campo "servico", não uses a rota da conversa como rótulo.
+Escolhe o serviço ou categoria da PCI-TechLab que melhor corresponde à necessidade real da empresa/projeto, com base no problema, objetivo, contexto e materiais discutidos.
+Se a necessidade não for clara, usa a categoria mais próxima possível e evita "Brainstorming/Ideacao" salvo se a conversa for efetivamente apenas exploração de ideia sem necessidade definida.
 
 Retorna um JSON válido (apenas JSON, sem markdown) com a seguinte estrutura:
 {
@@ -56,7 +67,11 @@ Importantes:
 Conversation:
 ${conversationText}
 
-Extract and synthesize the following information from the conversation. For each field, provide the most complete and relevant information, combining information from multiple messages if necessary. Do not make direct quotes from the user - synthesize the information in a natural and professional way.
+Extract and synthesize the following information from the conversation. For each field, provide the most complete and relevant information, combining information from multiple messages if necessary. Do not make direct quotes from the user - synthesize the information in a natural and professional way.${routeBInstruction}
+
+For the "servico" field, do not use the conversation route as a label.
+Choose the PCI-TechLab service or category that best matches the company's real need, based on the problem, goal, context, and materials discussed.
+If the need is unclear, use the closest possible category and avoid "Brainstorming/Ideacao" unless the conversation is genuinely only idea exploration with no defined need.
 
 Return valid JSON (only JSON, no markdown) with the following structure:
 {
