@@ -37,21 +37,22 @@ export default function EnviarResumoBotComponent({
   const [uploadLoading, setUploadLoading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string>("");
 
-  // Only show after step 3 (when user has chosen A or B)
+  // VERIFICAÇÃO DE VISIBILIDADE DO COMPONENTE
   const shouldShow = currentStep >= 4 && userChoice;
 
-  // Pass ref to parent so parent can use it
+  // PASSAGEM DE REFERÊNCIA AO COMPONENTE PAI
   useEffect(() => {
     if (fileInputRef && onFileInputRef) {
       onFileInputRef(fileInputRef);
     }
   }, [onFileInputRef]);
 
+  // MANIPULADOR DE SELEÇÃO DE FICHEIRO
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file
+    // VALIDAÇÃO DO FICHEIRO
     const validation = validateFile(file);
     if (!validation.valid) {
       setUploadError(validation.error || "Invalid file");
@@ -63,10 +64,10 @@ export default function EnviarResumoBotComponent({
     if (onUploadLoadingChange) onUploadLoadingChange(true);
 
     try {
-      // Convert file to base64
+      // CONVERSÃO PARA BASE64
       const base64Data = await fileToBase64(file);
 
-      // Create attachment object
+      // CRI AÇÃO DO OBJETO DE ANEXO
       const attachment: FileAttachment = {
         id: generateAttachmentId(),
         type: validation.type || "pdf",
@@ -76,7 +77,7 @@ export default function EnviarResumoBotComponent({
         size: file.size,
       };
 
-      // Pass attachment to parent (no need to analyze anymore, just attach)
+      // PASSAGEM DE ANEXO AO COMPONENTE PAI
       onDocumentsAnalyzed([attachment]);
     } catch (err) {
       console.error("File processing error:", err);
@@ -88,7 +89,7 @@ export default function EnviarResumoBotComponent({
     } finally {
       setUploadLoading(false);
       if (onUploadLoadingChange) onUploadLoadingChange(false);
-      // Reset file input
+      // RESET DA INPUT DE FICHEIRO
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }

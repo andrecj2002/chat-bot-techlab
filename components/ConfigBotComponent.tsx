@@ -40,6 +40,7 @@ export default function ConfigBotComponent() {
   const [contactAsked, setContactAsked] = useState<boolean>(false);
   const [routeBProceedToTechlab, setRouteBProceedToTechlab] = useState<boolean>(false);
 
+  // FILTRAGEM DE MENSAGENS E DETEÇÃO DE IDIOMA
   const userOnlyMessages = messages.filter((m) => m.role === "user");
   const showLanguageOptions = messages.length === 1 && messages[0]?.role === "assistant";
   
@@ -47,6 +48,8 @@ export default function ConfigBotComponent() {
   const firstUserLanguage = userOnlyMessages[0]?.content?.trim().toLowerCase() ?? "";
   const isEnglishFlow = firstUserLanguage.includes("english") || firstUserLanguage === "en";
   const isPortugueseFlow = !isEnglishFlow;
+
+  // DETEÇÃO DE RESPOSTAS DO ASSISTENTE
   const detectAssistantWantsDetails = (text: string) => {
     return /\?|gostaria de esclarecer|gostaria de saber|poderia detalh|poderia esclarecer|pode esclarecer|pode detalh|poderia indicar|pode indicar|poderia dizer|pode dizer|por exemplo|poderia fornecer|pode fornecer|poderia clarificar|pode clarificar|mais detalhe|mais detalhes|poderia especificar/i.test(
       text,
@@ -61,18 +64,17 @@ export default function ConfigBotComponent() {
     return hasLetterOptions || (hasBulletLines && mentionsOptions) || mentionsOptions;
   };
 
+  // DETECÇÃO DE PEDIDOS DE LOGÍSTICA E FINANÇAS
   const detectAssistantRequestsLogistics = (text: string) => {
-    // Only count as logistics/finance request if it mentions at least 2 of the 3 key areas together
-    // This avoids false positives when bot mentions timeline casually during brainstorming
     const hasDeadline = /deadline|prazo|prazos|timing|timeframe|schedule|quando|when/i.test(text);
     const hasFinance = /financ|orçamento|budget|custo|cost|investimento|investment/i.test(text);
     const hasTeam = /equipa interna|internal team|equipa técnica|technical team|team|recursos humanos|human resources/i.test(text);
     
-    // Need at least 2 of these 3 indicators present in the same message
     const indicatorCount = [hasDeadline, hasFinance, hasTeam].filter(Boolean).length;
     return indicatorCount >= 2;
   };
 
+  // DETECÇÃO DE PEDIDOS DE CONTACTO
   const detectAssistantRequestsContact = (text: string) => {
     return /contacto|contato|contact|contact details|follow-up|email|telefone|telemóvel|phone/i.test(text);
   };
@@ -89,6 +91,7 @@ export default function ConfigBotComponent() {
     );
   };
 
+  // DETEÇÃO DE PROSSEGUIMENTO DA ROTA B
   const detectRouteBProceeding = (text: string) => {
     return /\b(?:proceed|continue|continuar|prosseguir|seguir|go ahead|move forward|develop further|further develop|contact techlab|contactar.*techlab|contactar.*pci|contact.*techlab|contact.*pci|pode contactar|vamos em frente|vamos prosseguir|quero seguir|quero avançar|sim|yes|ok|okay|claro|sure)\b/i.test(
       text,
@@ -121,7 +124,7 @@ export default function ConfigBotComponent() {
   const shouldAskForContact = contactAsked || contactPromptWasAsked;
   const routeBCanAdvance = userChoice !== "B" || routeBProceedToTechlab || routeBProceedSignalExists;
 
-  // Verifica se o bot já pediu por logística/finanças (melhor indicador do que a resposta do utilizador)
+  // VERIFICAÇÃO DE PEDIDO DE LOGÍSTICA/FINANÇAS PELO BOT
   const botAskedForLogisticsFinance = messages.some(
     (message) => message.role === "assistant" && detectAssistantRequestsLogistics(message.content),
   );
@@ -180,7 +183,7 @@ export default function ConfigBotComponent() {
     });
   };
 
-  // RENDERIZAÇÃO DO TEXTO DO BOT PARA BOLD E LISTAS
+  // RENDERIZAÇÃO DO CONTEÚDO DO BOT COM FORMATAÇÃO
   const renderAssistantContent = (content: string) => {
     const normalized = content
       .replace(/\r/g, "")
@@ -336,7 +339,7 @@ export default function ConfigBotComponent() {
     return () => window.removeEventListener("load-cached-chat", handleLoadCachedChat);
   }, []);
 
-  // Reset chatSaved when messages change (allows re-saving after saving)
+  // REINICIALIZAÇÃO DE ESTADO DE GRAVAÇÃO COM NOVAS MENSAGENS
   useEffect(() => {
     if (chatSaved && messages.length > savedMessageCount) {
       // New messages have been added after saving, allow re-saving
@@ -344,7 +347,7 @@ export default function ConfigBotComponent() {
     }
   }, [messages.length, chatSaved, savedMessageCount]);
 
-  // Notify parent about chat state changes
+  // NOTIFICAÇÃO DE ALTERAÇÕES NO ESTADO DA CONVERSA
   useEffect(() => {
     const hasMessages = messages.length > 1;
     if (typeof window !== "undefined") {
@@ -360,7 +363,7 @@ export default function ConfigBotComponent() {
     }
   }, [messages.length, chatSaved, savedMessageCount]);
 
-  // Warn user before leaving page if there are unsaved messages
+  // AVISO DE MENSAGENS NÃO GUARDADAS AO SAIR
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       const hasUnsavedMessages = messages.length > 1 && !chatSaved;
@@ -375,7 +378,7 @@ export default function ConfigBotComponent() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [messages.length, chatSaved]);
 
-  // Auto-save chat when step exceeds 3 (after user chooses option A or B)
+  // GRAVAÇÃO AUTOMÁTICA DE CONVERSA APÓS ESCOLHA DE ROTA
   useEffect(() => {
     const autoSaveChat = async () => {
       if (currentStep > 3 && messages.length > 0 && !chatSaved && !isSaving) {
@@ -400,16 +403,13 @@ export default function ConfigBotComponent() {
     setPendingAttachments([]);
     setFileUploaded(false);
     
-    // clear input if it came from the typed field
     if (content === input) {
       setInput("");
     }
 
-    // Don't call API at step 6 - let the UI handle contact info and PDF generation
     if (currentStep === 6) {
       const userProvidedContactInfo = detectUserContactDetails(content);
 
-      // If the user is replying with contact details, do not ask for them again.
       if (userProvidedContactInfo) {
         setContactAsked(true);
 
@@ -423,9 +423,7 @@ export default function ConfigBotComponent() {
         return;
       }
 
-      // First, check if we've already asked for contact info
       if (!shouldAskForContact) {
-        // Ask for contact information
         const askingContactMessage: Message = {
           role: "assistant",
           content: isPortugueseFlow 
@@ -434,10 +432,10 @@ export default function ConfigBotComponent() {
         };
         setMessages((prev) => [...prev, askingContactMessage]);
         setContactAsked(true);
-        return; // Don't call API, wait for user to provide contact info
+        return; 
       }
       
-      // After contact info is provided, ask for PDF generation
+      // PEDIR POR CONTACTO E EM SEGUIDA PERGUNTAR POR GERAR O PDF
       if (!messages[messages.length - 1]?.content?.includes("Should I proceed") && !messages[messages.length - 1]?.content?.includes("Devo prosseguir")) {
         const askingMessage: Message = {
           role: "assistant",
@@ -450,11 +448,10 @@ export default function ConfigBotComponent() {
       }
     }
 
-    // immediate step transitions on user actions
+    // TRANSIÇÕES IMEDIATAS DE PASSOS NAS AÇÕES DO UTILIZADOR
     const lc = content.trim().toLowerCase();
     if (/^portugu(es|ês)?$|^pt$|^english$|^en$/i.test(lc)) {
       setStepIfHigher(2);
-      // Notify outer page about language choice so static intro can update
       try {
         if (typeof window !== "undefined") {
           if (/^portugu(es|ês)?$|^pt$/i.test(lc)) {
@@ -489,7 +486,7 @@ export default function ConfigBotComponent() {
       const marker: string | null = data.marker ?? null;
       setMessages([...updated, { role: "assistant", content: assistantReply }]);
 
-      // Prefer deterministic marker if provided by server/model
+      // PROCESSAMENTO DE MARCADORES DO SERVIDOR
       if (marker === "[COMPANY_DETAILS_REQUEST]") {
         setStepIfHigher(3);
       } else if (marker === "[OPTIONS_REQUEST]") {
@@ -501,7 +498,7 @@ export default function ConfigBotComponent() {
       } else if (marker === "[CONTACT_REQUEST]") {
         setStepIfHigher(6);
       } else {
-        // Fallback heuristics (best-effort)
+        // FALLBACK: HEURÍSTICA DE DETEÇÃO DE PASSOS
         const userCount = updated.filter((m) => m.role === "user").length;
         const nextStep = getStepFromAssistantReply(assistantReply, userCount);
         setStepIfHigher(nextStep);
@@ -538,12 +535,13 @@ export default function ConfigBotComponent() {
   }, [startConversation]);
 
   // Generate title from chat content
+  // GERAÇÃO DE TÍTULO DA CONVERSA
   const generateChatTitle = (chatMessages: Message[]): string => {
     try {
       const userMessages = chatMessages.filter((m) => m.role === "user");
       if (userMessages.length === 0) return "New Chat";
 
-      // Check if user selected A or B
+      // DETECÇÃO DE TIPO DE SERVIÇO (A OU B)
       let serviceType = "";
       for (const msg of userMessages) {
         const content = msg.content.trim().toUpperCase();
@@ -556,8 +554,7 @@ export default function ConfigBotComponent() {
         }
       }
 
-      // Find substantial user message - skip trivial ones
-      // Filter out: single words, language selections, short generic responses
+      // FILTRO DE MENSAGENS TRIVIAIS
       const trivialPatterns = /^(a|b|sim|não|yes|no|english|portuguese|português|pt|en|ok|ok\.|obrigado|thanks|thank you|graças|please|por favor)$/i;
       const substantiveMessages = userMessages.filter(
         (m) => {

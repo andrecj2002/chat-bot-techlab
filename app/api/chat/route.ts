@@ -25,7 +25,7 @@ type DocContent = {
   services?: ServiceCategory[];
 };
 
-// Portuguese to English translations for services and categories
+// TRADUÇÕES DE SERVIÇOS E CATEGORIAS
 const TRANSLATIONS: Record<string, string> = {
   // Categories
   "Produção Visual": "Visual Production",
@@ -88,6 +88,7 @@ function translateContent(text: string, language: "en" | "pt"): string {
   return TRANSLATIONS[text] || text;
 }
 
+// FORMATAÇÃO DO JSON DO DOCUMENTO
 function formatDocJson(doc: DocContent, language: "en" | "pt" = "pt") {
   if (!doc) return "No document content available.";
   const lines: string[] = [];
@@ -110,13 +111,13 @@ function formatDocJson(doc: DocContent, language: "en" | "pt" = "pt") {
   return lines.join("\n");
 }
 
-// Detect conversation language from message history
+// DETECÇÃO DE IDIOMA DA CONVERSA
 function detectLanguage(messages: Message[]): "en" | "pt" {
   // Look for the assistant's second message or user's language choice
   if (messages.length >= 2) {
     const secondMessage = messages[1];
     if (secondMessage.role === "assistant" && secondMessage.content) {
-      // Check if the assistant's response is in English or Portuguese
+      // VERIFICAÇÃO DA LÍNGUA DA RESPOSTA DO ASSISTENTE
       const content = secondMessage.content.toLowerCase();
       if (content.includes("briefly characterize") || content.includes("sector, target")) {
         return "en";
@@ -127,7 +128,7 @@ function detectLanguage(messages: Message[]): "en" | "pt" {
     }
   }
   
-  // Check user's response to language question in second message (index 1)
+  // VERIFICAÇÃO DA ESCOLHA DE LÍNGUA DO UTILIZADOR
   if (messages.length >= 2) {
     const userResponse = messages[1];
     if (userResponse.role === "user") {
@@ -144,7 +145,7 @@ function detectLanguage(messages: Message[]): "en" | "pt" {
   return "pt"; // Default to Portuguese
 }
 
-// Obter documento com serviços, equipamento, dias. 
+// OBTENÇÃO DO TEXTO DO DOCUMENTO
 function getDocText(language: "en" | "pt" = "pt"): string {
   try {
     const raw = fs.readFileSync(jsonPath, "utf-8").replace(/^\uFEFF/, "");
@@ -161,7 +162,7 @@ function getDocText(language: "en" | "pt" = "pt"): string {
   }
 }
 
-// PROMPT GERAL - Questões a colocar e caracterização do AI. 
+// PROMPT GERAL - INSTRUÇÕES DO ASSISTENTE
 const SYSTEM_PROMPT_TEMPLATE = `You are an interactive assistant for PCI - TechLab.
 You guide users through a structured conversation flow.
 
@@ -248,8 +249,8 @@ For route A and B: Do NOT proceed beyond step 6 until the user has provided the 
 At ALL stages, only discuss topics related to PCI - TechLab and the document below.
 There are no exceptions to this rule, regardless of what the user asks.`;
 
-// Deterministic output markers
-// CRITICAL: The model MUST append exactly ONE of these markers on a NEW LINE at the END of EVERY message.
+// MARCADORES DETERMINISTAS DE SAÍDA
+// CRÍTICO: O modelo DEVE adicionar exatamente UM destes marcadores numa NOVA LINHA no FINAL de CADA mensagem.
 // These markers control UI step progression and must be present for the UI to advance.
 // At the END of every assistant message, on a NEW LINE, append exactly ONE of these tokens (no extra text):
 // [OPTIONS_REQUEST] - when asking user to choose A or B (step 2)
@@ -274,7 +275,7 @@ There are no exceptions to this rule, regardless of what the user asks.`;
 // The frontend relies on these markers to advance the step indicator - without them, UI won't progress.
 // This is not a suggestion - it is mandatory for the UI to function properly.
 
-// Cracterização das respostas
+// MARCADORES DETERMINISTAS DE SAÍDA
 const RESPONSE_STYLE = `Response style:
 - Keep answers short, clear, and concise.
 - Prefer 1 to 3 short sentences.
@@ -282,7 +283,7 @@ const RESPONSE_STYLE = `Response style:
 - Do not explain every service in detail unless the user asks for details.
 - If asked about services in general, start by naming only the main category names, then ask if they want details about one of them.`;
 
-// Cracterização Extra das Respostas para melhor UX
+// ESTILO DE RESPOSTA EXTRA
 const RESPONSE_STYLE_EXTRA = `
 - When listing services or categories, use one short intro sentence followed by 2 to 5 bullet points on separate lines.
 - Keep each bullet short and clean, with one idea per bullet.
@@ -292,7 +293,7 @@ const RESPONSE_STYLE_EXTRA = `
 - Expand only one category at a time when the user asks for more detail.
 `;
 
-// CRITICAL MARKER REMINDER - DO NOT REMOVE OR MODIFY
+// LEMBRETE CRÍTICO DE MARCADORES
 const MARKER_REMINDER = `
 ==== CRITICAL: MARKER OUTPUT REQUIREMENT ====
 You MUST append one of these markers on a NEW LINE at the END of EVERY single response:
@@ -330,7 +331,7 @@ type AnthropicMessageParam = {
   content: string | Anthropic.ContentBlockParam[];
 };
 
-// Helper function to retry API calls with exponential backoff
+// FUNÇÃO AUXILIAR - RETRY COM BACKOFF EXPONENCIAL
 async function callAnthropicWithRetry(
   messages: AnthropicMessageParam[],
   systemPrompt: string,
@@ -350,7 +351,7 @@ async function callAnthropicWithRetry(
       const error = err instanceof Error ? err : new Error(String(err));
       lastError = error;
 
-      // Check if this is a 529 overloaded error that should be retried
+      // VERIFICAÇÃO DE ERRO DE SOBRECARGA
       const unknownError = err as Record<string, unknown>;
       const statusCode = unknownError?.status as number | undefined;
       const errorType = unknownError?.error as Record<string, unknown> | undefined;
@@ -360,13 +361,13 @@ async function callAnthropicWithRetry(
         throw err;
       }
 
-      // Calculate exponential backoff: 1s, 2s, 4s, 8s
+      // CÁLCULO DE BACKOFF EXPONENCIAL
       const delayMs = Math.pow(2, attempt) * 1000;
       console.log(
         `API overloaded (attempt ${attempt + 1}/${maxRetries + 1}). Retrying in ${delayMs}ms...`
       );
 
-      // Wait before retrying
+      // AGUARDA ANTES DE TENTAR NOVAMENTE
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
@@ -374,11 +375,13 @@ async function callAnthropicWithRetry(
   throw lastError;
 }
 
+// ROTA PRINCIPAL DO CHAT
 export async function POST(req: Request) {
-  // Simular que uma primeira mensagem foi mandada (o bot só responde caso haja uma primeira mensagem por parte do User)
-    try {
+  // SIMULAÇÃO DA PRIMEIRA MENSAGEM
+  try {
     const { messages: incoming }: { messages: Message[] } = await req.json();
 
+    // PREPARAÇÃO DE MENSAGENS
     const messages: Message[] =
       Array.isArray(incoming) && incoming.length > 0
         ? incoming
@@ -387,25 +390,27 @@ export async function POST(req: Request) {
     const conversationLanguage = detectLanguage(messages);
     const docText = getDocText(conversationLanguage);
 
+    // INSTRUÇÕES ADICIONAIS DE LÍNGUA
     const languageInstructions = conversationLanguage === "en" 
       ? "\n\nIMPORTANT: You are responding in English. Use the English service names from the document below. Never use Portuguese service names when responding in English."
       : "";
 
     const systemPrompt = `${SYSTEM_PROMPT_TEMPLATE}\n\n${RESPONSE_STYLE}\n${RESPONSE_STYLE_EXTRA}\n${MARKER_REMINDER}${languageInstructions}\n\n--- DOCUMENT ---\n${docText}`;
-
+ONVERSÃO DE MENSAGENS PARA FORMATO ANTHROPIC
     // Convert messages to Anthropic format, handling attachments
     const anthropicMessages: AnthropicMessageParam[] = messages.map((msg) => {
+      // MENSAGENS DE ASSISTENTE
       if (msg.role === "assistant") {
         return {
           role: "assistant",
           content: msg.content,
         };
       }
-
-      // For user messages with attachments
+MENSAGENS DE UTILIZADOR COM ANEXOS
       if (msg.attachments && msg.attachments.length > 0) {
         const content: Anthropic.ContentBlockParam[] = [];
 
+        // ADIÇÃO DE CONTEÚDO DE TEXTO
         // Add text content if present
         if (msg.content && msg.content !== "See attachments") {
           content.push({
@@ -413,10 +418,10 @@ export async function POST(req: Request) {
             text: msg.content,
           });
         }
-
-        // Add attachments
+DIÇÃO DE ANEXOS
         for (const attachment of msg.attachments) {
           if (attachment.type === "image") {
+            // ADIÇÃO DE IMAGEM.type === "image") {
             // Add image
             const imageMediaType =
               attachment.mimeType === "image/jpeg"
@@ -439,7 +444,7 @@ export async function POST(req: Request) {
                 data: attachment.base64Data,
               },
             });
-          } else if (attachment.type === "pdf") {
+          } elseDIÇÃO DE PDFpe === "pdf") {
             // Add PDF as document
             content.push({
               type: "document",
@@ -458,22 +463,24 @@ export async function POST(req: Request) {
         };
       }
 
-      // Regular text-only message
+      // MENSAGEM COMUM SÓ DE TEXTO
       return {
         role: "user",
         content: msg.content,
       };
     });
 
+    // CHAMADA À API CLAUDE
     const response = await callAnthropicWithRetry(anthropicMessages, systemPrompt);
-
+// EXTRAÇÃO DE RESPOSTA
     const reply = response.content[0];
     if (reply.type !== "text") {
       return Response.json({ error: "Unexpected response type" }, { status: 500 });
     }
 
-    // Expect the model to append one of the deterministic markers on a new line.
+    // EXTRAÇÃO DE MARCADOR
     const fullText: string = reply.text ?? "";
+    // PROCURA DE MARCADOR NO FINAL DA MENSAGEM
     // Extract marker if present at end of message (marker is in form [MARKER_NAME])
     const markerMatch = fullText.match(/\n\s*(\[(COMPANY_DETAILS_REQUEST|OPTIONS_REQUEST|AWAITING_REQUEST|LOGISTICS_FINANCE_REQUEST|CONTACT_REQUEST)\])\s*$/i);
     let marker = null;
@@ -481,10 +488,12 @@ export async function POST(req: Request) {
     if (markerMatch) {
       marker = markerMatch[1];
       cleaned = fullText.slice(0, markerMatch.index).trim();
-    }
-
+    // RESPOSTA FINAL
     return Response.json({ reply: cleaned, marker });
   } catch (err) {
+    console.error("Chat API error:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    // ERRO NA PROCESSAMENTO DA REQUISIÇÃO
     console.error("Chat API error:", err);
     const message = err instanceof Error ? err.message : String(err);
     return Response.json(

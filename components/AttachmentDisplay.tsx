@@ -21,6 +21,7 @@ export default function AttachmentDisplay({
           key={attachment.id}
           className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
         >
+          {/* ÍCONE DO TIPO DE FICHEIRO */}
           {attachment.type === "image" ? (
             <svg
               className="w-4 h-4 text-slate-500"
@@ -46,6 +47,7 @@ export default function AttachmentDisplay({
               />
             </svg>
           )}
+          {/* INFORMAÇÕES DO FICHEIRO */}
           <div className="flex-1 min-w-0">
             <div className="truncate text-slate-900 font-medium">
               {attachment.fileName}
@@ -54,6 +56,7 @@ export default function AttachmentDisplay({
               {formatFileSize(attachment.size)}
             </div>
           </div>
+          {/* BOTÃO DE REMOÇÃO */}
           <button
             onClick={() => onRemove(attachment.id)}
             disabled={isDisabled}

@@ -16,6 +16,7 @@ interface ExtractedData {
 
 export async function POST(request: Request) {
   try {
+    // EXTRAÇÃO DE DADOS DO CORPO DA REQUISIÇÃO
     const { messages, isPortugueseFlow, routeBProceedToTechlab } = (await request.json()) as {
       messages: Message[];
       isPortugueseFlow: boolean;
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     };
     const routeBIsActive = Boolean(routeBProceedToTechlab);
 
-    // Build conversation text for analysis
+    // CONSTRUÇÃO DO TEXTO DA CONVERSA PARA ANÁLISE
     const conversationText = messages
       .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
       .join("\n");
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
         : "\n\nThe conversation is on Route B and the user has explicitly agreed to proceed with PCI-TechLab."
       : "";
 
+    // PROMPT DE EXTRAÇÃO ADAPTADO AO IDIOMA
     const extractionPrompt = isPortugueseFlow
       ? `Analisa a seguinte conversa com um cliente e extrai as informações estruturadas solicitadas.
 
@@ -91,6 +93,7 @@ Important:
 - Avoid direct quotes - paraphrase and synthesize
 - If the user answered with little detail to a question, acknowledge that limitation but offer the best possible summary`;
 
+    // CHAMADA À API CLAUDE
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1024,
@@ -102,15 +105,15 @@ Important:
       ],
     });
 
+    // EXTRAÇÃO DO TEXTO DA RESPOSTA
     const responseText =
       response.content[0].type === "text" ? response.content[0].text : "";
 
     console.log("Claude response:", responseText);
 
-    // Parse JSON response - handle potential markdown formatting
+    // PROCESSAMENTO DO JSON - LIMPEZA DE MARKDOWN
     let jsonText = responseText;
     
-    // Remove markdown code blocks if present
     if (jsonText.includes("```json")) {
       jsonText = jsonText.replace(/```json\n?/, "").replace(/```\n?$/, "");
     } else if (jsonText.includes("```")) {

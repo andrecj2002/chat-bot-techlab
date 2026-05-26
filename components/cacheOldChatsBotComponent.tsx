@@ -43,7 +43,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
   const [language, setLanguage] = useState<"pt" | "en">("pt");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
-  // Helper function to filter and sort chats
+  // FILTRO E ORDENAÇÃO DE CONVERSAS GUARDADAS
   const getFilteredAndSortedChats = (allChats: CachedChat[]): CachedChat[] => {
     const now = Date.now();
     const fortyEightHoursAgo = now - 48 * 60 * 60 * 1000;
@@ -61,7 +61,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
     return filteredChats;
   };
 
-  // Load cached chats from localStorage
+  // CARREGAMENTO DE CONVERSAS GUARDADAS
   const loadCachedChats = () => {
     setLoading(true);
     try {
@@ -78,14 +78,14 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
     }
   };
 
-  // Load chats when modal opens
+  // CARREGAMENTO DE CONVERSAS AO ABRIR MODAL
   useEffect(() => {
     if (isOpen) {
       loadCachedChats();
     }
   }, [isOpen]);
 
-  // Listen for language changes
+  // DETECÇÃO DE ALTERAÇÕES DE IDIOMA
   useEffect(() => {
     const handleLanguageChange = (event: any) => {
       setLanguage(event.detail?.lang || "pt");
@@ -95,8 +95,8 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
     return () => window.removeEventListener("language-changed", handleLanguageChange);
   }, []);
 
+  // MANIPULADOR DE CARREGAMENTO DE CONVERSA
   const handleLoadChat = (chat: CachedChat) => {
-    // Dispatch custom event for ConfigBotComponent to listen to
     if (typeof window !== "undefined") {
       window.dispatchEvent(
         new CustomEvent("load-cached-chat", {
@@ -107,6 +107,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
     setIsOpen(false);
   };
 
+  // LIMPEZA DO HISTÓRICO DE CONVERSAS
   const clearHistory = () => {
     const confirmMessage = language === "pt" 
       ? "Tem a certeza de que deseja eliminar todas as conversas (exceto as guardadas permanentemente)? Esta ação não pode ser desfeita."
@@ -127,6 +128,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
     }
   };
 
+  // ALTERNÂNCIA DE ESTADO PERMANENTE DE CONVERSA
   const togglePermanent = (chatId: string, event: React.MouseEvent) => {
     event.stopPropagation();
     try {
@@ -139,13 +141,14 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
         localStorage.setItem("chatbot_cache", JSON.stringify(allChats));
         const filteredChats = getFilteredAndSortedChats(allChats);
         setCachedChats(filteredChats);
-        setOpenMenuId(null); // Close menu after toggling
+        setOpenMenuId(null);
       }
     } catch (error) {
       console.error("Error toggling permanent status:", error);
     }
   };
 
+  // ELIMINAÇÃO DE CONVERSA
   const deleteChat = (chatId: string, event: React.MouseEvent) => {
     event.stopPropagation();
     const confirmMessage = language === "pt" 
@@ -167,14 +170,14 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
     }
   };
 
+  // DOWNLOAD DE PDF DE CONVERSA GUARDADA
   const downloadPDF = async (chat: CachedChat, event: React.MouseEvent) => {
     event.stopPropagation();
     try {
-      // Use cached extracted data if available, otherwise should not happen
+      // DADOS EXTRAÍDOS GUARDADOS OU FALLBACK
       let extractedData = chat.extractedData;
 
       if (!extractedData) {
-        // Fallback if no cached data (shouldn't happen)
         extractedData = {
           empresa: chat.title || "Document",
           servico: "Não especificado",
@@ -187,7 +190,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
         };
       }
 
-      // Generate PDF
+      // GERAÇÃO DO PDF
       const jsPDF = (await import("jspdf")).jsPDF;
       const pdf = new jsPDF({
         orientation: "portrait",
@@ -195,7 +198,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
         format: "a4",
       });
 
-      // Set fonts
+      // DEFINIÇÃO DE FONTES
       pdf.setFont("Helvetica", "bold");
       pdf.setFontSize(16);
       pdf.text("pci · creative science park tech lab", 105, 20, { align: "center" });
@@ -213,7 +216,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
         { align: "center" }
       );
 
-      // Table data
+      // DADOS DA TABELA
       const rows = [
         {
           categoria: language === "pt" ? "Serviço" : "Service",
@@ -245,10 +248,10 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
         },
       ];
 
-      // Table styling
+      // FORMATAÇÃO DA TABELA
       let currentY = 50;
 
-      // Header
+      // CABÉALHO
       pdf.setFont("Helvetica", "bold");
       pdf.setFontSize(10);
       pdf.text(language === "pt" ? "Categoria" : "Category", 15, currentY + 8);
@@ -256,7 +259,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
       pdf.line(15, currentY + 12, 200, currentY + 12);
       currentY += 20;
 
-      // Rows
+      // LINHAS
       pdf.setFont("Helvetica", "normal");
       pdf.setFontSize(9);
       rows.forEach((row) => {

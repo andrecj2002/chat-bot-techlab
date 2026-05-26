@@ -29,15 +29,18 @@ export interface ExtractedData {
   contacto: string;
 }
 
+// DETECÇÃO DE PROSSEGUIMENTO DA ROTA B
 const detectRouteBProceeding = (text: string) => {
   return /\b(?:proceed|continue|continuar|prosseguir|seguir|go ahead|move forward|develop further|further develop|contact techlab|contactar.*techlab|contactar.*pci|contact.*techlab|contact.*pci|pode contactar|vamos em frente|vamos prosseguir|quero seguir|quero avançar|sim|yes|ok|okay|claro|sure)\b/i.test(
     text,
   );
 };
 
+// VERIFICAÇÃO DE SINAIS DE PROSSEGUIMENTO DA ROTA B
 const hasRouteBProceedSignal = (messages: Message[]) =>
   messages.some((message) => message.role === "user" && detectRouteBProceeding(message.content));
 
+// INFERÊNCIA DO TIPO DE SERVIÇO A PARTIR DA CONVERSA
 const inferServiceFromConversation = (messages: Message[], isPortugueseFlow: boolean) => {
   const conversation = messages.map((message) => message.content).join(" ").toLowerCase();
 
@@ -87,6 +90,7 @@ export default function GerarResumoBotComponent({
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
   const [localPdfGenerated, setLocalPdfGenerated] = useState(externalPdfGenerated);
 
+  // GERAÇÃO DO DOCUMENTO PDF
   const generatePDFDocument = useCallback(async (extractedData: ExtractedData) => {
     const pdf = new jsPDF({
       orientation: "portrait",
@@ -110,7 +114,7 @@ export default function GerarResumoBotComponent({
       { align: "center" }
     );
 
-    // Table data
+    // DADOS DA TABELA
     const rows = [
       {
         categoria: isPortugueseFlow ? "Servico" : "Service",
@@ -142,10 +146,10 @@ export default function GerarResumoBotComponent({
       },
     ];
 
-    // Table styling
+    // FORMATAÇÃO DA TABELA
     let currentY = 50;
 
-    // Header
+    // CABÉALHO DA TABELA
     pdf.setFont("Helvetica", "bold");
     pdf.setFontSize(10);
     pdf.text(isPortugueseFlow ? "Categoria" : "Category", 15, currentY + 8);
@@ -153,46 +157,47 @@ export default function GerarResumoBotComponent({
     pdf.line(15, currentY + 12, 200, currentY + 12);
     currentY += 20;
 
-    // Rows
+    // LINHAS DA TABELA
     pdf.setFont("Helvetica", "normal");
     pdf.setFontSize(9);
     rows.forEach((row) => {
-      // Check if we need a new page
+      // VERIFICAÇÃO DE NOVA PÁGINA
       if (currentY > 270) {
         pdf.addPage();
         currentY = 20;
       }
 
-      // Category
+      // CATEGORIA
       pdf.text(row.categoria, 15, currentY);
 
-      // Description (with text wrapping)
+      // DESCRIÇÃO (COM QUEBRA DE TEXTO)
       const descriptionLines = pdf.splitTextToSize(row.descricao, 130);
       pdf.text(descriptionLines, 70, currentY);
 
-      // Calculate row height based on content
+      // CÁLCULO DE ALTURA DE LINHA COM BASE NO CONTEÚDO
       const cellHeight = Math.max(10, descriptionLines.length * 6);
       currentY += cellHeight + 5;
 
-      // Row separator
+      // SEPARADOR DE LINHA
       pdf.line(15, currentY - 5, 200, currentY - 5);
     });
 
-    // Download PDF
+    // DOWNLOAD DO PDF
     const fileName = `resumo_${extractedData.empresa}.pdf`;
     pdf.save(fileName);
     
-    // Also save base64 version for email
+    // VERSÃO BASE64 PARA EMAIL
     const pdfDataUri = pdf.output("datauristring");
     const base64String = pdfDataUri.split(",")[1];
     setPdfBase64(base64String);
   }, [isPortugueseFlow]);
 
+  // MANIPULADOR DE GERAÇÃO DO PDF
   const handleGeneratePDF = useCallback(async () => {
     setIsGenerating(true);
     
     try {
-      // Try to extract data via API first
+      // TENTA EXTRAIR DADOS VIA API
       const extractResponse = await fetch("/api/extract-data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -206,11 +211,11 @@ export default function GerarResumoBotComponent({
       let extractedData: ExtractedData;
 
       if (extractResponse.ok) {
-        // API extraction successful
+        // EXTRAÇÃO VIA API BEM SUCEDIDA
         const responseData = await extractResponse.json();
         extractedData = responseData.data;
       } else {
-        // API failed, use simple local extraction
+        // EXTRAÇÃO LOCAL (FALLBACK)
         console.warn("API extraction failed, using local extraction");
         extractedData = {
           empresa: messages.find((m, i) => m.role === "user" && i > 0 && m.content !== "A" && m.content !== "B")?.content || "Nao especificado",
@@ -224,10 +229,10 @@ export default function GerarResumoBotComponent({
         };
       }
 
-      // Generate and download PDF
+      // GERAÇÃO E DOWNLOAD DO PDF
       await generatePDFDocument(extractedData);
 
-      // Add confirmation message
+      // MENSAGEM DE CONFIRMAÇÃO
       const pdfMessage: Message = {
         role: "assistant",
         content: isPortugueseFlow 
@@ -268,6 +273,7 @@ export default function GerarResumoBotComponent({
     }
   }, [messages, isPortugueseFlow, generatePDFDocument, onPDFGenerated, onAskedForPDF, onAddMessage]);
 
+  // REDOWNLOAD DO PDF
   const redownloadPDF = useCallback(async () => {
     if (pdfExtractedData) {
       try {
@@ -278,7 +284,7 @@ export default function GerarResumoBotComponent({
     }
   }, [pdfExtractedData, generatePDFDocument]);
 
-  // Render PDF confirmation buttons (only if not already generated)
+  // RENDERIZAÇÃO DOS BOTÕES DE CONFIRMAÇÃO DO PDF
   if (showConfirmation && !localPdfGenerated && !externalPdfGenerated) {
     return (
       <div className="flex flex-col gap-3">
@@ -319,7 +325,7 @@ export default function GerarResumoBotComponent({
     );
   }
 
-  // Render PDF redownload button (shown after PDF is generated)
+  // RENDERIZAÇÃO DO BOTÃO DE REDOWNLOAD (APÓS GERAÇÃO)
   if ((localPdfGenerated || externalPdfGenerated) && pdfExtractedData) {
     return (
       <div className="flex flex-col gap-3">

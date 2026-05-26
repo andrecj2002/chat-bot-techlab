@@ -44,6 +44,7 @@ export default function ContactarEmailComponent({
     }
   });
 
+  // MANIPULADOR DE ENVIO DE EMAIL
   const handleSendEmail = async () => {
     if (alreadySent) {
       setError(isPortugueseFlow ? "O email já foi enviado para esta conversa." : "An email has already been sent for this conversation.");
@@ -62,6 +63,7 @@ export default function ContactarEmailComponent({
     setError(null);
 
     try {
+      // ENVIO DE EMAIL VIA API
       const response = await fetch("/api/send-email", {
         method: "POST",
         headers: {
@@ -83,11 +85,11 @@ export default function ContactarEmailComponent({
         );
       }
 
-        // parse response JSON for previewUrl or other info
+        // RESPOSTA DO SERVIDOR COM PRÉ-VISUALIZAÇÃO
         const successData = await response.json().catch(() => ({}));
         if (successData.previewUrl) setPreviewUrl(successData.previewUrl);
 
-        // Mark as sent (UI + storage) and notify parent
+        // MARCAÇÃO COMO ENVIADO E NOTIFICAÇÃO DO COMPONENTE PAI
         setEmailSent(true);
         setShowConsent(false);
         try {
@@ -110,11 +112,12 @@ export default function ContactarEmailComponent({
     }
   };
 
+  // MANIPULADOR DE REJEITAÇÃO
   const handleDismiss = () => {
     setShowConsent(false);
   };
 
-  // Show consent to send email
+  // RENDERIZAÇÃO DO CONSENTIMENTO DE ENVIO
   if (showConsent && pdfBase64) {
     return (
       <div className="rounded-3xl rounded-tl-md border border-slate-200 bg-white px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base leading-6 sm:leading-7 text-slate-900 shadow-sm">
@@ -189,7 +192,7 @@ export default function ContactarEmailComponent({
     );
   }
 
-  // Show success message
+  // RENDERIZAÇÃO DE MENSAGEM DE SUCESSO
   if (emailSent) {
     return (
       <div className="p-4 mb-4 text-sm text-green-800 rounded-md bg-green-100" role="alert">
@@ -209,7 +212,7 @@ export default function ContactarEmailComponent({
     );
   }
 
-  // If an email was already sent for this chat, show an info alert instead of consent
+  // RENDERIZAÇÃO DE AVISO DE EMAIL JÁ ENVIADO
   if (alreadySent && pdfBase64) {
     return (
       <div className="p-4 mb-4 text-sm text-sky-800 rounded-md bg-sky-100" role="alert">
@@ -225,7 +228,7 @@ export default function ContactarEmailComponent({
     );
   }
 
-  // Show error message
+  // RENDERIZAÇÃO DE MENSAGEM DE ERRO
   if (error) {
     return (
       <div className="p-4 mb-4 text-sm text-red-800 rounded-md bg-red-100" role="alert">
@@ -246,6 +249,6 @@ export default function ContactarEmailComponent({
     );
   }
 
-  // Don't render if no PDF
+  // SEM RENDERIZAÇÃO SE NÃO HÁ PDF
   return null;
 }
