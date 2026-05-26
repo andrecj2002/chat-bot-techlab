@@ -62,7 +62,15 @@ export default function ConfigBotComponent() {
   };
 
   const detectAssistantRequestsLogistics = (text: string) => {
-    return /deadline|prazo|prazos|financ|orçamento|budget|equipa interna|internal team|timing|timeframe|schedule/i.test(text);
+    // Only count as logistics/finance request if it mentions at least 2 of the 3 key areas together
+    // This avoids false positives when bot mentions timeline casually during brainstorming
+    const hasDeadline = /deadline|prazo|prazos|timing|timeframe|schedule|quando|when/i.test(text);
+    const hasFinance = /financ|orçamento|budget|custo|cost|investimento|investment/i.test(text);
+    const hasTeam = /equipa interna|internal team|equipa técnica|technical team|team|recursos humanos|human resources/i.test(text);
+    
+    // Need at least 2 of these 3 indicators present in the same message
+    const indicatorCount = [hasDeadline, hasFinance, hasTeam].filter(Boolean).length;
+    return indicatorCount >= 2;
   };
 
   const detectAssistantRequestsContact = (text: string) => {
@@ -113,6 +121,11 @@ export default function ConfigBotComponent() {
   const shouldAskForContact = contactAsked || contactPromptWasAsked;
   const routeBCanAdvance = userChoice !== "B" || routeBProceedToTechlab || routeBProceedSignalExists;
 
+  // Verifica se o bot já pediu por logística/finanças (melhor indicador do que a resposta do utilizador)
+  const botAskedForLogisticsFinance = messages.some(
+    (message) => message.role === "assistant" && detectAssistantRequestsLogistics(message.content),
+  );
+
   const steps = isEnglishFlow
     ? [
         { label: "Language" },
@@ -138,9 +151,10 @@ export default function ConfigBotComponent() {
     if (userChoice === "A") return steps;
     if (userChoice === "B") {
       const routeB = [...baseSteps, { label: isEnglishFlow ? "Brainstorming" : "Brainstorming" }];
-      if (routeBProceedToTechlab && currentStep >= 5) {
-        routeB.push(steps[4]); // "Logistics & Finance" / "Logística e Finanças"
-        routeB.push(steps[5]); // "Contact" / "Contacto"
+      // Mostrar logística e finanças quando o bot começar a perguntar por eles
+      if (botAskedForLogisticsFinance) {
+        routeB.push(steps[4]); // LOGISTICAS E FINANÇAS
+        routeB.push(steps[5]); // CONTACTO
       }
       return routeB;
     }
@@ -462,10 +476,6 @@ export default function ConfigBotComponent() {
       }
     }
 
-    if (currentStep === 4 && userChoice === "B" && detectRouteBProceeding(content)) {
-      setRouteBProceedToTechlab(true);
-    }
-
     setLoading(true);
     try {
       const res = await fetch("/api/chat", {
@@ -487,22 +497,14 @@ export default function ConfigBotComponent() {
       } else if (marker === "[AWAITING_REQUEST]") {
         setStepIfHigher(4);
       } else if (marker === "[LOGISTICS_FINANCE_REQUEST]") {
-        if (routeBCanAdvance) {
-          setStepIfHigher(5);
-        } else {
-          setStepIfHigher(4);
-        }
+        setStepIfHigher(5);
       } else if (marker === "[CONTACT_REQUEST]") {
-        if (routeBCanAdvance) {
-          setStepIfHigher(6);
-        } else {
-          setStepIfHigher(4);
-        }
+        setStepIfHigher(6);
       } else {
         // Fallback heuristics (best-effort)
         const userCount = updated.filter((m) => m.role === "user").length;
         const nextStep = getStepFromAssistantReply(assistantReply, userCount);
-        setStepIfHigher(routeBCanAdvance ? nextStep : Math.min(nextStep, 4));
+        setStepIfHigher(nextStep);
       }
     } catch (err) {
       console.error("sendMessage error:", err);
@@ -613,7 +615,7 @@ export default function ConfigBotComponent() {
     }
   };
 
-  // Manual save function
+  // GUARDAR O CHAT MANUALMENTE (UNUSED())
   const handleSaveChat = async (isAutoSave: boolean = false) => {
     if (messages.length === 0 || isSaving) return;
     
@@ -622,9 +624,8 @@ export default function ConfigBotComponent() {
       const title = generateChatTitle(messages);
       saveChat(messages, title, currentChatId);
       setChatSaved(true);
-      setSavedMessageCount(messages.length); // Track message count at save time
+      setSavedMessageCount(messages.length); 
       
-      // Only dispatch event for manual saves, not auto-save
       if (!isAutoSave && typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("chat-saved-success"));
       }
@@ -633,11 +634,11 @@ export default function ConfigBotComponent() {
     }
   };
 
-  // Auto-save chat when step exceeds 3 (after user chooses option A or B)
+  // Auto-save no passo 3 
   useEffect(() => {
     const autoSaveChat = async () => {
       if (currentStep > 3 && messages.length > 0 && !chatSaved && !isSaving) {
-        await handleSaveChat(true); // Pass true to indicate auto-save
+        await handleSaveChat(true); 
       }
     };
 

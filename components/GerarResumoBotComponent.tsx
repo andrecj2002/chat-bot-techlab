@@ -214,11 +214,7 @@ export default function GerarResumoBotComponent({
         console.warn("API extraction failed, using local extraction");
         extractedData = {
           empresa: messages.find((m, i) => m.role === "user" && i > 0 && m.content !== "A" && m.content !== "B")?.content || "Nao especificado",
-          servico: messages.find((m) => m.content === "A")
-            ? "Consultoria/Assessoria"
-            : messages.find((m) => m.content === "B")
-            ? inferServiceFromConversation(messages, isPortugueseFlow)
-            : "Nao especificado",
+          servico: inferServiceFromConversation(messages, isPortugueseFlow),
           contexto: messages.find((m) => m.role === "user" && m.content.length > 50)?.content.slice(0, 200) || "Nao especificado",
           prazoSolicitado: "Nao especificado",
           requisitoEspecificos: "Nao especificado",
