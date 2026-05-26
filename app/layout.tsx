@@ -20,7 +20,7 @@ const anton = Anton({
 });
 
 export const metadata: Metadata = {
-  title: "Chat-bOT - TechLab",
+  title: "chat-bot - TechLab",
   description: "PCI - Creative Science Park TechLab Chat Bot",
 };
 

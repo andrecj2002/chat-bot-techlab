@@ -1,57 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# chat-bot - TechLab
 
-## Getting Started
+Chatbot para suporte de serviços do TechLab (PCI - Parque de Ciência e Inovação de Aveiro) com dois fluxos de conversa: Rota A (Conhecer Serviços) e Rota B (Explorar Ideias). Usa Claude Haiku 4.5, suporta Português e Inglês.
 
-First, run the development server:
+## Funcionalidades
+
+- Dois fluxos de conversa diferentes
+- Disponivel em PT-PT e em Inglês;
+- Gera PDFs com resumo da conversa
+- Envio direto de PDFs por email
+- Guardar e carregar conversas anteriores
+- Anexar documentos às conversas
+
+## Componentes
+
+- **ConfigBotComponent.tsx** - Interface do chat, progressão de passos, formatação de mensagens
+- **GerarResumoBotComponent.tsx** - Gera PDFs com dados da conversa
+- **EnviarResumoBotComponent.tsx** - Upload de ficheiros e envio por email
+- **cacheOldChatsBotComponent.tsx** - Histórico de conversas
+- **AttachmentDisplay.tsx** - Mostra ficheiros anexados
+
+## Quick start
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Setup de email
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Email sending
-
-This app sends generated PDFs using plain SMTP through `nodemailer`.
-
-For a simple real-world test, use a Gmail account with an App Password and set these values in `.env.local`:
+Usa Mailgun para envio de emails. Configura `.env.local`:
 
 ```env
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_SECURE=false
-EMAIL_USER=youraddress@gmail.com
-EMAIL_PASSWORD=your_gmail_app_password
-EMAIL_FROM=youraddress@gmail.com
+
 ```
 
-Notes:
+Ver [documentação Mailgun](https://documentation.mailgun.com) para detalhes de configuração.
 
-- Gmail requires 2-step verification and an App Password, not your normal login password.
-- The email is sent to `joaoajorge@ua.pt`.
-- If these values are missing, `/api/send-email` will return a clear SMTP configuration error.
+## APIs
 
-## Learn More
+**POST /api/chat** (`app/api/chat/route.ts`)
 
-To learn more about Next.js, take a look at the following resources:
+- Processa mensagens de utilizador com Claude Haiku 4.5
+- Detecta idioma, prazos, logística e passa marcadores de progresso
+- Retorna resposta do bot e marcador de passos
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**POST /api/extract-data** (`app/api/extract-data/route.ts`)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Extrai dados estruturados da conversa (empresa, serviço, contexto, prazos, requisitos, equipa)
+- Recorre ao Claude para análise da conversa
+- Retorna JSON com informações para o PDF
 
-## Deploy on Vercel
+**POST /api/send-email** (`app/api/send-email/route.ts`)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Envia PDF por email via Mailgun API
+- Recebe PDF em base64, dados extraídos e idioma
+- Gera HTML com detalhes e envia para o e-mail selecionado
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Fluxos
+
+O utilizador pode escolher 2 rotas, das quais surgem os seguintes passos:
+**Rota A (Conhecer Serviços)**
+
+1. Idioma
+2. Escolhe Rota A
+3. Dados da empresa
+4. Descreve o que precisa
+5. Prazos/orçamento
+6. Contacto
+7. Gerar e Enviar PDF
+
+**Rota B (Explorar Ideias)**
+
+1. Idioma
+2. Escolhe Rota B
+3. Dados da empresa
+4. Brainstorming (sem falar em prazos/orçamento)
+   Aqui, o utilizador pode escolher se quer prosseguir com a ideia para o TechLab. Se esse for o caso, será remetido para os seguintes passos:
+5. Prazos/orçamento (após aprovação)
+6. Contacto
+7. Gerar e Enviar PDF
+
+## Stack
+
+- Next.js 15+ com TypeScript
+- Claude Haiku 4.5 (possibilidade de alteração)
+- React hooks
+- Tailwind CSS
+- jsPDF
+- Mailgun (envio de emails)
+
+## Contacto
+
+Email: joaoajorge@ua.pt
