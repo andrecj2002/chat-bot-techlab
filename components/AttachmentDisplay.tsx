@@ -60,7 +60,7 @@ export default function AttachmentDisplay({
           <button
             onClick={() => onRemove(attachment.id)}
             disabled={isDisabled}
-            className="text-slate-400 hover:text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed ml-1 flex-shrink-0"
+            className="text-slate-400 hover:text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed ml-1 shrink-0"
             title="Remove attachment"
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import "iconify-icon";
 
 export type CachedChat = {
@@ -36,7 +36,7 @@ interface CacheOldChatsBotComponentProps {
   onLoadChat: (messages: CachedChat["messages"]) => void;
 }
 
-export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsBotComponentProps) {
+export default function CacheOldChatsBotComponent({ }: CacheOldChatsBotComponentProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [cachedChats, setCachedChats] = useState<CachedChat[]>([]);
   const [loading, setLoading] = useState(false);
@@ -62,7 +62,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
   };
 
   // CARREGAMENTO DE CONVERSAS GUARDADAS
-  const loadCachedChats = () => {
+  const loadCachedChats = useCallback(() => {
     setLoading(true);
     try {
       const stored = localStorage.getItem("chatbot_cache");
@@ -76,19 +76,23 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // CARREGAMENTO DE CONVERSAS AO ABRIR MODAL
   useEffect(() => {
     if (isOpen) {
-      loadCachedChats();
+      const loadChats = () => {
+        loadCachedChats();
+      };
+      loadChats();
     }
-  }, [isOpen]);
+  }, [isOpen, loadCachedChats]);
 
   // DETECÇÃO DE ALTERAÇÕES DE IDIOMA
   useEffect(() => {
-    const handleLanguageChange = (event: any) => {
-      setLanguage(event.detail?.lang || "pt");
+    const handleLanguageChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ lang: "pt" | "en" }>;
+      setLanguage(customEvent.detail?.lang || "pt");
     };
 
     window.addEventListener("language-changed", handleLanguageChange);
@@ -309,13 +313,6 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
     }
   };
 
-  const getChatPreview = (messages: CachedChat["messages"]) => {
-    const userMessages = messages.filter((m) => m.role === "user");
-    if (userMessages.length === 0) return "No messages";
-    const lastUserMessage = userMessages[userMessages.length - 1];
-    return lastUserMessage.content.substring(0, 50) + (lastUserMessage.content.length > 50 ? "..." : "");
-  };
-
   const getMessageCount = (messages: CachedChat["messages"]) => {
     return messages.length;
   };
@@ -419,7 +416,7 @@ export default function CacheOldChatsBotComponent({ onLoadChat }: CacheOldChatsB
                             e.stopPropagation();
                             setOpenMenuId(openMenuId === chat.id ? null : chat.id);
                           }}
-                          className="flex-shrink-0 p-2 rounded-lg hover:bg-slate-300 transition text-slate-600 hover:text-slate-900"
+                          className="shrink-0 p-2 rounded-lg hover:bg-slate-300 transition text-slate-600 hover:text-slate-900"
                           title={language === "pt" ? "Opções" : "Options"}
                         >
                           {/* @ts-expect-error - Web component type not recognized */}

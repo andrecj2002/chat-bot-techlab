@@ -16,11 +16,6 @@ type Message = {
 export default function ConfigBotComponent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const setStepIfHigher = (step: number) =>
-    setCurrentStep((prev) => {
-      const boundedStep = userChoice === "B" && !routeBCanAdvance ? Math.min(step, 4) : step;
-      return Math.max(prev, boundedStep);
-    });
   const [input, setInput] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -28,17 +23,17 @@ export default function ConfigBotComponent() {
   const [chatSaved, setChatSaved] = useState<boolean>(false);
   const [savedMessageCount, setSavedMessageCount] = useState<number>(0);
   const [userChoice, setUserChoice] = useState<"A" | "B" | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [documentFileInputRef, setDocumentFileInputRef] = useState<React.MutableRefObject<HTMLInputElement | null> | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [fileUploadLoading, setFileUploadLoading] = useState<boolean>(false);
   const [fileUploaded, setFileUploaded] = useState<boolean>(false);
-  const [currentChatId, setCurrentChatId] = useState<string>(`chat_${Date.now()}`);
+  const [currentChatId, setCurrentChatId] = useState<string>(() => `chat_${Math.random().toString(36).substr(2, 9)}`);
   const [pendingAttachments, setPendingAttachments] = useState<FileAttachment[]>([]);
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [contactAsked, setContactAsked] = useState<boolean>(false);
   const [routeBProceedToTechlab, setRouteBProceedToTechlab] = useState<boolean>(false);
+  const hasInitializedRef = useRef<boolean>(false);
 
   // FILTRAGEM DE MENSAGENS E DETEÇÃO DE IDIOMA
   const userOnlyMessages = messages.filter((m) => m.role === "user");
@@ -102,7 +97,7 @@ export default function ConfigBotComponent() {
     (message) => message.role === "user" && detectRouteBProceeding(message.content),
   );
 
-  const getStepFromAssistantReply = (reply: string, fallbackUserCount: number) => {
+  const getStepFromAssistantReply = useCallback((reply: string, fallbackUserCount: number) => {
     if (detectAssistantRequestsContact(reply)) return 6;
     if (detectAssistantRequestsLogistics(reply)) return 5;
     if (detectAssistantRequestsCompanyDetails(reply)) return 3;
@@ -114,7 +109,7 @@ export default function ConfigBotComponent() {
     if (fallbackUserCount >= 3) return 4;
     if (fallbackUserCount >= 2) return 3;
     return 1;
-  };
+  }, []);
 
   const showInput = !(currentStep === 1 || currentStep === 2);
   const showUploadButton = currentStep >= 4 && userChoice;
@@ -123,6 +118,13 @@ export default function ConfigBotComponent() {
   );
   const shouldAskForContact = contactAsked || contactPromptWasAsked;
   const routeBCanAdvance = userChoice !== "B" || routeBProceedToTechlab || routeBProceedSignalExists;
+
+  // FUNÇÃO PARA DEFINIR PASSO SE FOR MAIOR
+  const setStepIfHigher = useCallback((step: number) =>
+    setCurrentStep((prev) => {
+      const boundedStep = userChoice === "B" && !routeBCanAdvance ? Math.min(step, 4) : step;
+      return Math.max(prev, boundedStep);
+    }), [userChoice, routeBCanAdvance]);
 
   // VERIFICAÇÃO DE PEDIDO DE LOGÍSTICA/FINANÇAS PELO BOT
   const botAskedForLogisticsFinance = messages.some(
@@ -234,33 +236,27 @@ export default function ConfigBotComponent() {
   };
 
   // INICIO DAS CONVERSAS: MANDAR MENSAGEM (NÃO MOSTRADA) DO UTILIZADOR PARA INICIAR O FLUXO DO BOT
-  const startConversation = useCallback(async (): Promise<void> => {
+  // GUARDAR O CHAT MANUALMENTE
+  const handleSaveChat = useCallback(async (isAutoSave: boolean = false) => {
+    if (messages.length === 0 || isSaving) return;
+    
+    setIsSaving(true);
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [{ role: "user", content: "Hello" }] }),
-      });
-      if (!res.ok) throw new Error(`API error ${res.status}`);
-      const data = await res.json();
-      const assistantReply = data.reply ?? "";
-      const marker: string | null = data.marker ?? null;
-      setMessages([{ role: "assistant", content: assistantReply }]);
-      setCurrentStep(1);
-      setChatSaved(false); 
-      setSavedMessageCount(0); 
-      setRouteBProceedToTechlab(false);
-      if (marker === "[COMPANY_DETAILS_REQUEST]") setStepIfHigher(2);
-    } catch (err) {
-      console.error("startConversation error:", err);
-      setMessages([{ role: "assistant", content: "Sorry, something went wrong." }]);
+      const title = generateChatTitle(messages);
+      saveChat(messages, title, currentChatId);
+      setChatSaved(true);
+      setSavedMessageCount(messages.length); 
+      
+      if (!isAutoSave && typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("chat-saved-success"));
+      }
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
-  }, []);
+  }, [messages, isSaving, currentChatId, saveChat]);
 
   useEffect(() => {
-    const handleLoadCachedChat = (event: any) => {
+    const handleLoadCachedChat = (event: CustomEvent) => {
       const { messages, chatId } = event.detail;
       setMessages(messages);
       setInput("");
@@ -335,15 +331,17 @@ export default function ConfigBotComponent() {
       setCurrentStep(calculatedStep);
     };
 
-    window.addEventListener("load-cached-chat", handleLoadCachedChat);
-    return () => window.removeEventListener("load-cached-chat", handleLoadCachedChat);
-  }, []);
+    window.addEventListener("load-cached-chat", handleLoadCachedChat as EventListener);
+    return () => window.removeEventListener("load-cached-chat", handleLoadCachedChat as EventListener);
+  }, [getStepFromAssistantReply]);
 
   // REINICIALIZAÇÃO DE ESTADO DE GRAVAÇÃO COM NOVAS MENSAGENS
   useEffect(() => {
     if (chatSaved && messages.length > savedMessageCount) {
-      // New messages have been added after saving, allow re-saving
-      setChatSaved(false);
+      const timer = setTimeout(() => {
+        setChatSaved(false);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [messages.length, chatSaved, savedMessageCount]);
 
@@ -382,12 +380,12 @@ export default function ConfigBotComponent() {
   useEffect(() => {
     const autoSaveChat = async () => {
       if (currentStep > 3 && messages.length > 0 && !chatSaved && !isSaving) {
-        await handleSaveChat(true); // Pass true to indicate auto-save
+        await handleSaveChat(true);
       }
     };
 
     void autoSaveChat();
-  }, [currentStep, messages.length, chatSaved, isSaving]);
+  }, [currentStep, messages.length, chatSaved, isSaving, handleSaveChat]);
 
   const sendMessageWithContent = async (content: string, attachmentsToSend?: FileAttachment[]): Promise<void> => {
     if (!content.trim() && (!attachmentsToSend || attachmentsToSend.length === 0)) return;
@@ -527,12 +525,41 @@ export default function ConfigBotComponent() {
   }, [messages]);
 
   useEffect(() => {
-    const id = setTimeout(() => {
-      void startConversation();
-    }, 0);
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      const initializeChat = async () => {
+        try {
+          const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages: [{ role: "user", content: "Hello" }] }),
+          });
+          if (!res.ok) throw new Error(`API error ${res.status}`);
+          const data = await res.json();
+          const assistantReply = data.reply ?? "";
+          const marker: string | null = data.marker ?? null;
+          setMessages([{ role: "assistant", content: assistantReply }]);
+          setCurrentStep(1);
+          setChatSaved(false); 
+          setSavedMessageCount(0); 
+          setRouteBProceedToTechlab(false);
+          if (marker === "[COMPANY_DETAILS_REQUEST]") {
+            setCurrentStep(2);
+          }
+        } catch (err) {
+          console.error("Chat initialization error:", err);
+          setMessages([{ role: "assistant", content: "Sorry, something went wrong." }]);
+        } finally {
+          setLoading(false);
+        }
+      };
+      const id = setTimeout(() => {
+        void initializeChat();
+      }, 0);
 
-    return () => clearTimeout(id);
-  }, [startConversation]);
+      return () => clearTimeout(id);
+    }
+  }, []); // Empty dependency array - only run once on mount
 
   // Generate title from chat content
   // GERAÇÃO DE TÍTULO DA CONVERSA
@@ -572,7 +599,7 @@ export default function ConfigBotComponent() {
       );
 
       // If no substantial message found, try to use any non-trivial message
-      let titleMessage = substantiveMessages[0]?.content || 
+      const titleMessage = substantiveMessages[0]?.content || 
                         userMessages.find(m => {
                           const trimmed = m.content.trim();
                           return trimmed.length > 5 && !trivialPatterns.test(trimmed);
@@ -612,35 +639,7 @@ export default function ConfigBotComponent() {
     }
   };
 
-  // GUARDAR O CHAT MANUALMENTE (UNUSED())
-  const handleSaveChat = async (isAutoSave: boolean = false) => {
-    if (messages.length === 0 || isSaving) return;
-    
-    setIsSaving(true);
-    try {
-      const title = generateChatTitle(messages);
-      saveChat(messages, title, currentChatId);
-      setChatSaved(true);
-      setSavedMessageCount(messages.length); 
-      
-      if (!isAutoSave && typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("chat-saved-success"));
-      }
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
-  // Auto-save no passo 3 
-  useEffect(() => {
-    const autoSaveChat = async () => {
-      if (currentStep > 3 && messages.length > 0 && !chatSaved && !isSaving) {
-        await handleSaveChat(true); 
-      }
-    };
-
-    void autoSaveChat();
-  }, [currentStep, messages.length, chatSaved, isSaving]);
 
   // Reset chat function
   const handleResetChat = async () => {
@@ -663,9 +662,30 @@ export default function ConfigBotComponent() {
     setCurrentChatId(`chat_${Date.now()}`);
     setContactAsked(false);
     setRouteBProceedToTechlab(false);
+    setLoading(true);
 
     // Start new conversation
-    void startConversation();
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: "Hello" }] }),
+      });
+      if (!res.ok) throw new Error(`API error ${res.status}`);
+      const data = await res.json();
+      const assistantReply = data.reply ?? "";
+      const marker: string | null = data.marker ?? null;
+      setMessages([{ role: "assistant", content: assistantReply }]);
+      setCurrentStep(1);
+      if (marker === "[COMPANY_DETAILS_REQUEST]") {
+        setCurrentStep(2);
+      }
+    } catch (err) {
+      console.error("Reset chat error:", err);
+      setMessages([{ role: "assistant", content: "Sorry, something went wrong." }]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Close menu when clicking outside
@@ -682,6 +702,7 @@ export default function ConfigBotComponent() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
+  // RENDERIZAÇÃO PRINCIPAL
   return (
     <div className="flex h-full min-h-0 w-full flex-col font-sans">
       <div className="chat-scroll flex-1 min-h-0 overflow-y-auto pr-1">
@@ -693,16 +714,17 @@ export default function ConfigBotComponent() {
                 {m.attachments && m.attachments.length > 0 && (
                   <div className="flex flex-wrap gap-2 justify-end">
                     {m.attachments.map((att) => (
-                      <div key={att.id} className="bg-white rounded-lg border border-slate-200 overflow-hidden max-w-[200px]">
+                      <div key={att.id} className="bg-white rounded-lg border border-slate-200 overflow-hidden max-w-50">
                         {att.type === "image" ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={`data:${att.mimeType};base64,${att.base64Data}`}
                             alt={att.fileName}
-                            className="max-w-full max-h-[200px] object-cover rounded-lg"
+                            className="max-w-full max-h-50 object-cover rounded-lg"
                           />
                         ) : (
                           <div className="flex items-center gap-2 px-3 py-2 text-sm">
-                            <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <svg className="w-5 h-5 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 3.414l4 4v10.586A2 2 0 0114 20H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H7a1 1 0 01-1-1v-6z" clipRule="evenodd" />
                             </svg>
                             <span className="truncate text-slate-900 font-medium">{att.fileName}</span>
@@ -799,7 +821,6 @@ export default function ConfigBotComponent() {
           <EnviarResumoBotComponent
             currentStep={currentStep}
             userChoice={userChoice}
-            isEnglishFlow={isEnglishFlow}
             isPortugueseFlow={isPortugueseFlow}
             onDocumentsAnalyzed={handleDocumentsAttached}
             isLoading={loading}
@@ -829,7 +850,7 @@ export default function ConfigBotComponent() {
         <div className="flex flex-col gap-0 border-t border-slate-300 mt-4">
           <AttachmentDisplay
             attachments={pendingAttachments}
-            onRemove={(id) => setPendingAttachments(pendingAttachments.filter((a) => a.id !== id))}
+            onRemove={(id) => setPendingAttachments(pendingAttachments.filter((a: FileAttachment) => a.id !== id))}
             isDisabled={loading || fileUploadLoading}
           />
           <div className="flex items-center gap-2 sm:gap-3 px-1 py-2 sm:py-2">

@@ -24,7 +24,6 @@ type EnviarResumoBotComponentProps = {
 export default function EnviarResumoBotComponent({
   currentStep,
   userChoice,
-  isEnglishFlow,
   isPortugueseFlow,
   onDocumentsAnalyzed,
   isLoading = false,
@@ -32,7 +31,7 @@ export default function EnviarResumoBotComponent({
   onUploadLoadingChange,
   fileUploaded = false,
   userMessageCount = 0,
-}: EnviarResumoBotComponentProps) {
+}: Omit<EnviarResumoBotComponentProps, 'isEnglishFlow'> & { isPortugueseFlow: boolean }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadLoading, setUploadLoading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string>("");

@@ -396,8 +396,8 @@ export async function POST(req: Request) {
       : "";
 
     const systemPrompt = `${SYSTEM_PROMPT_TEMPLATE}\n\n${RESPONSE_STYLE}\n${RESPONSE_STYLE_EXTRA}\n${MARKER_REMINDER}${languageInstructions}\n\n--- DOCUMENT ---\n${docText}`;
-ONVERSÃO DE MENSAGENS PARA FORMATO ANTHROPIC
-    // Convert messages to Anthropic format, handling attachments
+
+    // CONVERSÃO DE MENSAGENS PARA FORMATO ANTHROPIC
     const anthropicMessages: AnthropicMessageParam[] = messages.map((msg) => {
       // MENSAGENS DE ASSISTENTE
       if (msg.role === "assistant") {
@@ -406,23 +406,23 @@ ONVERSÃO DE MENSAGENS PARA FORMATO ANTHROPIC
           content: msg.content,
         };
       }
-MENSAGENS DE UTILIZADOR COM ANEXOS
+
+      // MENSAGENS DE UTILIZADOR COM ANEXOS
       if (msg.attachments && msg.attachments.length > 0) {
         const content: Anthropic.ContentBlockParam[] = [];
 
         // ADIÇÃO DE CONTEÚDO DE TEXTO
-        // Add text content if present
         if (msg.content && msg.content !== "See attachments") {
           content.push({
             type: "text",
             text: msg.content,
           });
         }
-DIÇÃO DE ANEXOS
+
+        // ADIÇÃO DE ANEXOS
         for (const attachment of msg.attachments) {
           if (attachment.type === "image") {
-            // ADIÇÃO DE IMAGEM.type === "image") {
-            // Add image
+            // ADIÇÃO DE IMAGEM
             const imageMediaType =
               attachment.mimeType === "image/jpeg"
                 ? "image/jpeg"
@@ -444,8 +444,8 @@ DIÇÃO DE ANEXOS
                 data: attachment.base64Data,
               },
             });
-          } elseDIÇÃO DE PDFpe === "pdf") {
-            // Add PDF as document
+          } else if (attachment.type === "pdf") {
+            // ADIÇÃO DE PDF
             content.push({
               type: "document",
               source: {
@@ -488,12 +488,11 @@ DIÇÃO DE ANEXOS
     if (markerMatch) {
       marker = markerMatch[1];
       cleaned = fullText.slice(0, markerMatch.index).trim();
+    }
+
     // RESPOSTA FINAL
     return Response.json({ reply: cleaned, marker });
   } catch (err) {
-    console.error("Chat API error:", err);
-    const message = err instanceof Error ? err.message : String(err);
-    // ERRO NA PROCESSAMENTO DA REQUISIÇÃO
     console.error("Chat API error:", err);
     const message = err instanceof Error ? err.message : String(err);
     return Response.json(

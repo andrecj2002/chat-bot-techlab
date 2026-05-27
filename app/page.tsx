@@ -6,11 +6,12 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 
 export default function Home() {
-  const [language, setLanguage] = useState<"pt" | "en">("pt");
+  const [, setLanguage] = useState<"pt" | "en">("pt");
 
   useEffect(() => {
-    const handleLanguageChange = (event: any) => {
-      setLanguage(event.detail?.lang || "pt");
+    const handleLanguageChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ lang: "pt" | "en" }>;
+      setLanguage(customEvent.detail?.lang || "pt");
     };
 
     window.addEventListener("language-changed", handleLanguageChange);
