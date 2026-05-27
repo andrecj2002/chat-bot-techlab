@@ -30,13 +30,29 @@ Abre [http://localhost:3000](http://localhost:3000)
 
 ## Setup de email
 
-Usa Mailgun para envio de emails. Configura `.env.local`:
-
-```env
-
-```
+Usa Mailgun para envio de emails. Configura as variáveis no `.env.local` (ver secção **API Keys & Limitações** abaixo).
 
 Ver [documentação Mailgun](https://documentation.mailgun.com) para detalhes de configuração.
+
+## ⚠️ API Keys & Limitações
+
+**Claude Haiku 4.5** e **Mailgun** têm limitações de tokens/mensagens na tier gratuita:
+
+- **Claude (Anthropic)**: Token limits na API gratuita. Uma vez atingido o limite, o chatbot não conseguirá processar mensagens.
+- **Mailgun**: Limite de emails enviados gratuitamente. Uma vez ultrapassado, os emails não serão entregues.
+
+### Para manter funcionalidade:
+1. Cria conta paga no [Anthropic Console](https://console.anthropic.com) e adiciona billing
+2. Cria conta paga no [Mailgun Dashboard](https://app.mailgun.com) e adiciona billing
+3. Configura as tuas chaves API no arquivo `.env.local`:
+
+```env
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+MAILGUN_API_KEY=your_mailgun_api_key_here
+MAILGUN_DOMAIN=your_mailgun_domain_here
+```
+
+**Nota**: Sem as chaves de API configuradas ou com os limites gratuitos atingidos, o chatbot deixará de funcionar.
 
 ## APIs
 
