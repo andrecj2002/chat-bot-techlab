@@ -63,10 +63,10 @@ export default function ConfigBotComponent() {
   const detectAssistantRequestsLogistics = (text: string) => {
     const hasDeadline = /deadline|prazo|prazos|timing|timeframe|schedule|quando|when/i.test(text);
     const hasFinance = /financ|orçamento|budget|custo|cost|investimento|investment/i.test(text);
-    const hasTeam = /equipa interna|internal team|equipa técnica|technical team|team|recursos humanos|human resources/i.test(text);
+    const hasTeam = /equipa interna|internal team|equipa técnica|technical team|recursos humanos|human resources/i.test(text);
     
-    const indicatorCount = [hasDeadline, hasFinance, hasTeam].filter(Boolean).length;
-    return indicatorCount >= 2;
+    // MUST have all 3 indicators to be considered a logistics/finance request
+    return hasDeadline && hasFinance && hasTeam;
   };
 
   // DETECÇÃO DE PEDIDOS DE CONTACTO
@@ -88,9 +88,10 @@ export default function ConfigBotComponent() {
 
   // DETEÇÃO DE PROSSEGUIMENTO DA ROTA B
   const detectRouteBProceeding = (text: string) => {
-    return /\b(?:proceed|continue|continuar|prosseguir|seguir|go ahead|move forward|develop further|further develop|contact techlab|contactar.*techlab|contactar.*pci|contact.*techlab|contact.*pci|pode contactar|vamos em frente|vamos prosseguir|quero seguir|quero avançar|sim|yes|ok|okay|claro|sure)\b/i.test(
-      text,
-    );
+    // More specific detection: user must explicitly say they want to proceed WITH TECHLAB or contact TechLab
+    // Avoid matching generic "proceed" or "move forward" which could be about the idea itself
+    const explicitTechLabIntent = /techlab|pci.*techlab|contact.*techlab|proceed.*techlab|proceed with|move forward with.*techlab|follow up|want.*proceed|gostaria de prosseguir|contactar.*techlab|contactar.*pci|quero prosseguir|vamos contactar/i.test(text);
+    return explicitTechLabIntent;
   };
 
   const routeBProceedSignalExists = messages.some(
