@@ -42,6 +42,7 @@ Ver [documentação Mailgun](https://documentation.mailgun.com) para detalhes de
 - **Mailgun**: Limite de emails enviados gratuitamente. Uma vez ultrapassado, os emails não serão entregues.
 
 ### Para manter funcionalidade:
+
 1. Cria conta paga no [Anthropic Console](https://console.anthropic.com) e adiciona billing
 2. Cria conta paga no [Mailgun Dashboard](https://app.mailgun.com) e adiciona billing
 3. Configura as tuas chaves API no arquivo `.env.local`:
